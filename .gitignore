@@ -1,0 +1,10 @@
+__pycache__/
+lcpcli/__pycache__/
+tmp.py
+*.pyc
+build/
+dist/
+dist/
+lcpcli.egg-info/
+lcp-upload/
+corpert/
