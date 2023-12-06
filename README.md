@@ -26,7 +26,7 @@ lcpcli --help
 
 Convert and upload:
 
-1. Create a parent directory in which you have child directory that contains all your properly-fromatted CONLLU files
+1. Create a parent directory in which you have a child directory that contains all your properly-fromatted CONLLU files
 
 2. In the **parent** directory, next to the folder containing the CONLLU files, create a template `.json` file that describes your corpus structure, for example:
 
@@ -99,7 +99,11 @@ Convert and upload:
 
 3. Visit LCP and create a new project if you don't already have one where your corpus should go
 
-4. Retrieve the API key and secret for your project by clicking on the button that says: "Create API Key". The secret will appear at the bottom of the page and remain visible only for 120s, after which it will disappear forever (you would then need to revoke the API key and create a new one) -- the key itself is listed above the button that says "Revoke API key" (make sure to **not** copy the line that starts with "Secret Key" along with the API key itself)
+4. Retrieve the API key and secret for your project by clicking on the button that says: "Create API Key"
+
+    The secret will appear at the bottom of the page and remain visible only for 120s, after which it will disappear forever (you would then need to revoke the API key and create a new one)
+    
+    The key itself is listed above the button that says "Revoke API key" (make sure to **not** copy the line that starts with "Secret Key" along with the API key itself)
 
 5. Once you have your API key and secret, you can start converting and uploading your corpus by running the following command:
 
