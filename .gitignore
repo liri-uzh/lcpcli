@@ -6,5 +6,3 @@ build/
 dist/
 dist/
 lcpcli.egg-info/
-lcp-upload/
-corpert/
