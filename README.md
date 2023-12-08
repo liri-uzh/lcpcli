@@ -4,16 +4,16 @@
 
 ## Installation
 
+Clone this project along with its submodules:
+
 ```bash
-# use python 3.11
-pip install lcpcli
+git clone --recurse-submodules git@gitlab.uzh.ch:LiRI/projects/lcpcli.git
 ```
 
-or 
+Make sure you have python 3.11 and pip install in your local environment, then run:
 
 ```bash
-# use python 3.11
-python setup.py install
+./install.sh
 ```
 
 ## Usage
