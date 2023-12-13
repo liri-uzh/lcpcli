@@ -7,7 +7,7 @@ from lcp_upload import lcp_upload
 from inspect import signature
 
 class Lcpcli:
-    
+
     def __init__(
         self,
         *args,
@@ -23,25 +23,26 @@ class Lcpcli:
         return self.run(*args, **kwargs)
 
     def run(self):
-        
+
         upload = self.kwargs.get("api_key") and self.kwargs.get("secret")
         corpert = None
-        
+
         if self.kwargs.get("content"):
-        
+            self.kwargs['content'] = os.path.abspath(self.kwargs['content'])
+
             corpert_signature = signature(Corpert.__init__)
             corpert_kwargs = {k:v for k,v in self.kwargs.items() if k in corpert_signature.parameters}
             corpert = Corpert(**corpert_kwargs)
-            
+
             if upload:
                 if self.kwargs.get("mode", "") == "upload":
                     path = os.path.dirname(corpert._path)
                     assert next((f for f in os.listdir(path) if f.endswith(".json")), None), FileNotFoundError(f"No JSON file found in {path}")
-            
+
             corpert.run()
-        
+
         if upload:
-            
+
             if corpert and self.kwargs.get("mode", "") == "upload":
                 path = os.path.dirname(corpert._path)
                 output_dir = os.path.join(path,"_upload")
@@ -55,16 +56,16 @@ class Lcpcli:
                         shutil.copy(os.path.join(path,f), os.path.join(output_dir,f))
                 self.kwargs["corpus"] = output_dir
                 print("corpert._path", output_dir)
-            
+
             assert self.kwargs.get("corpus"), SyntaxError("No corpus found to upload")
-            
+
             lcp_upload_signature = signature(lcp_upload)
             lcp_upload_kwargs = {k:v for k,v in self.kwargs.items() if k in lcp_upload_signature.parameters}
-            
+
             print("lcp_upload_kwargs", lcp_upload_kwargs)
-        
+
             lcp_upload(**lcp_upload_kwargs)
-        
+
 
 if __name__ == "__main__":
     """
