@@ -10,7 +10,7 @@ Clone this project along with its submodules:
 git clone --recurse-submodules git@gitlab.uzh.ch:LiRI/projects/lcpcli.git
 ```
 
-Make sure you have python 3.11 and pip install in your local environment, then run:
+Make sure you have python 3.11 and pip installed in your local environment, then run:
 
 ```bash
 ./install.sh
@@ -24,11 +24,22 @@ Help:
 lcpcli --help
 ```
 
-Convert and upload:
+### CoNLL-U Format
+
+The CoNLL-U format is documented at: https://universaldependencies.org/format.html
+
+The LCP CLI converter will treat all the comments that start with `text` as document-level attributes. 
+This means that if a CoNLL-U file contains the line `# text_author = John Doe`, then in LCP all the sentences from this file will be associated with a document whose `meta` attribute will contain `text_author: 'John Doe'`
+
+All other comment lines following the format `# key = value` will add an entry to the `meta` attribute of the _segment_ corresponding to the sentence below that line (ie not at the document level) 
+
+See below how to report these attributes in the template `.json` file
+
+### Convert and Upload
 
 1. Create a parent directory in which you have a child directory that contains all your properly-fromatted CONLLU files
 
-2. In the **parent** directory, next to the folder containing the CONLLU files, create a template `.json` file that describes your corpus structure, for example:
+2. In the **parent** directory, next to the folder containing the CONLLU files, create a template `.json` file that describes your corpus structure (see above about the `attributes` key on `Document` and `Segment`), for example:
 
 ```
 {
@@ -74,7 +85,15 @@ Convert and upload:
         "Segment": {
             "abstract": false,
             "layerType": "span",
-            "contains": "Token"
+            "contains": "Token",
+            "attributes": {
+                "meta": {
+                    "key": {
+                      "type": "text",
+                      "nullable": true
+                    }
+                }
+            }
         },
         "Document": {
             "abstract": false,
@@ -82,11 +101,7 @@ Convert and upload:
             "layerType": "span",
             "attributes": {
                 "meta": {
-                    "language": {
-                      "type": "text",
-                      "nullable": true
-                    },
-                    "author": {
+                    "text_author": {
                       "type": "text",
                       "nullable": true
                     }
