@@ -34,17 +34,15 @@ class Lcpcli:
             corpert_kwargs = {k:v for k,v in self.kwargs.items() if k in corpert_signature.parameters}
             corpert = Corpert(**corpert_kwargs)
 
-            if upload:
-                if self.kwargs.get("mode", "") == "upload":
-                    path = os.path.dirname(corpert._path)
-                    assert next((f for f in os.listdir(path) if f.endswith(".json")), None), FileNotFoundError(f"No JSON file found in {path}")
-
             corpert.run()
 
         if upload:
 
             if corpert and self.kwargs.get("mode", "") == "upload":
                 path = os.path.dirname(corpert._path)
+
+                assert next((f for f in os.listdir(path) if f.endswith(".json")), None), FileNotFoundError(f"No JSON file found in {path}")
+
                 output_dir = os.path.join(path,"_upload")
                 if not os.path.isdir(output_dir):
                     os.mkdir(output_dir)
