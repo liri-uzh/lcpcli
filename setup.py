@@ -19,10 +19,10 @@ setup(
     author="Jeremy Zehr and Jonathan Schaber",
     include_package_data=False,
     zip_safe=True,
-    packages=["lcpcli","lcp-upload","corpert"],
+    # packages=["lcpcli","lcp-upload","corpert"],
     scripts=["bin/lcpcli"],
     author_email="jeremy.zehr@uzh.ch",
-    license="MIT",
-    keywords=["corpus", "linguistics", "corpora", "conll", "tei", "vert"],
+    # license="MIT",
+    # keywords=["corpus", "linguistics", "corpora", "conll", "tei", "vert"],
     install_requires=[],
 )
