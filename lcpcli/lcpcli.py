@@ -39,7 +39,7 @@ class Lcpcli:
         if upload:
 
             if corpert and self.kwargs.get("mode", "") == "upload":
-                path = os.path.dirname(corpert._path)
+                path = self.kwargs.get("output", os.path.dirname(corpert._path))
 
                 assert next((f for f in os.listdir(path) if f.endswith(".json")), None), FileNotFoundError(f"No JSON file found in {path}")
 

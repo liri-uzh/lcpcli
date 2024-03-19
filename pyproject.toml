@@ -1,6 +1,6 @@
 [project]
 name = "lcpcli"
-version = "0.0.8"
+version = "0.1.1"
 authors = [
   { name="Jeremy Zehr", email="jeremy.zehr@uzh.ch" },
 ]
@@ -24,6 +24,9 @@ packages = ["lcpcli", "corpert", "corpert.parsers", "lcp_upload"]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["corpert/requirements.txt","lcp-upload/requirements.txt"]}
+
+[tool.setuptools.package-data]
+'corpert' = ['*.json']
 
 [project.urls]
 Homepage = "https://gitlab.uzh.ch/LiRI/projects/lcpcli"
