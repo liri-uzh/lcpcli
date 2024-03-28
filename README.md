@@ -110,6 +110,73 @@ Finally, you need to report a corresponding entity type in the template `.json` 
 
 Make sure to set the `abstract`, `layerType` and `contains` attributes as illustrated above. See the section [Convert and Upload](#convert-and-upload) for a full example of a template `.json` file.
 
+
+#### Global attributes
+
+Some, it makes sense for multiple entity types to share references: in those cases, they can define _global attributes_. An example of a global attribute is a speaker or an agent that can have a name, an age, etc. and be associated with both a segment (a sentence) and, say, a gesture. The corpus template would include definitions along these lines:
+
+```json
+"globalAttributes": {
+    "agent": {
+        "type": "dict",
+        "keys": {
+            "name": {
+                "type": "text"
+            },
+            "age": {
+                "type": "number"
+            }
+        }
+    }
+},
+"layer": {
+    "Segment": {
+        "abstract": false,
+        "layerType": "span",
+        "contains": "Token",
+        "attributes": {
+            "agent": {
+                "ref": "agent"
+            }
+        }
+    },
+    "Gesture": {
+        "abstract": false,
+        "layerType": "span",
+        "anchoring": {
+            "time": true
+        },
+        "attributes": {
+            "agent": {
+                "ref": "agent"
+            }
+        }
+    }
+}
+```
+
+You should include a file named `global_attribute_agent.tsv` (mind the singular on `attribute`) with three columns: `agent_id`, `name` and `age`, and reference the values of `agent_id` appropriately as a sentence-level comment in your CoNLL-U files as well as in a file named `gesture.tsv`. For example:
+
+*global_attribute_agent.tsv*:
+```tsv
+agent_id	name	age
+10	Jane Doe	37
+```
+
+CoNLL-U file:
+```conllu
+# sent_id = 1
+# agent_id = 10
+The the _ _ _
+```
+
+*gesture.tsv*:
+```tsv
+gesture_id	agent_id	frame_range
+1	10	[2345,5678]
+```
+
+
 ### Convert and Upload
 
 1. Create a directory in which you have all your properly-fromatted CONLLU files
