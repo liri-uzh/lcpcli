@@ -20,6 +20,19 @@ classifiers = [
 ]
 keywords = [ "corpus", "linguistics", "corpora", "CONLL", "TEI", "VERT" ]
 license = { text = "MIT" }
+dependencies = [
+  "jsonpickle>=3.0",
+  "jsonschema>=4.21",
+  "lupa>=1.13",
+  "lxml>=4.7.1",
+  "py7zr>=0.20.5",
+  "requests>=2.30.0",
+  "tqdm>=4.65.0",
+  "types-requests>=2.30.0.0",
+  "types-tqdm>=4.65.0.1",
+  "xmltodict>=0.13",
+]
+
 
 [project.urls]
 Homepage = "https://github.com/liri-uzh/lcpcli/issues"
@@ -43,18 +56,6 @@ lcpcli = "lcpcli.lcpcli:run"
 lcp-upload = "lcpcli.lcp_upload:run"
 corpert = "lcpcli.corpert:run"
 
-dependencies = [
-  "jsonpickle>=3.0",
-  "jsonschema>=4.21",
-  "lupa>=1.13",
-  "lxml>=4.7.1",
-  "py7zr>=0.20.5",
-  "requests>=2.30.0",
-  "tqdm>=4.65.0",
-  "types-requests>=2.30.0.0",
-  "types-tqdm>=4.65.0.1",
-  "xmltodict>=0.13",
-]
 #[tool.hatch.metadata]
 #allow-direct-references = true
 
