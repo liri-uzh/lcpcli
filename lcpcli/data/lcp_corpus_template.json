@@ -1,0 +1,325 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://liri.linguistik.uzh.ch/lcp_corpus_template.json",
+    "title": "LCP Corpus Template",
+    "description": "Configuration of a corpus as represented in LCP",
+    "type": "object",
+    "$defs": {
+        "attribute": {
+            "type": "object",
+            "oneOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "isGlobal": {
+                            "description": "Whether the values of this attribute are globally defined (e.g. universal dependencies)",
+                            "type": "boolean"
+                        },
+                        "type": {
+                            "description": "The type of this attribute",
+                            "type": "string",
+                            "enum": [
+                                "text",
+                                "categorical",
+                                "dict",
+                                "date",
+                                "number",
+                                "labels",
+                                "boolean"
+                            ]
+                        },
+                        "nullable": {
+                            "description": "Whether this attribute's value can be null",
+                            "type": "boolean"
+                        }
+                    },
+                    "required": [
+                        "type"
+                    ]
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "ref": {
+                            "description": "A reference to a global attribute",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "ref"
+                    ]
+                }
+            ]
+        },
+        "relation": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "The name of the relation (e.g. head)"
+                },
+                "entity": {
+                    "type": "string",
+                    "description": "The name of the entity type (layer) the relation models"
+                },
+                "nullable": {
+                    "type": "boolean",
+                    "description": "Whether the relation needs to be defined"
+                }
+            },
+            "required": [
+                "name",
+                "entity"
+            ]
+        }
+    },
+    "properties": {
+        "meta": {
+            "description": "Information about this corpus (name, authors, year, etc.)",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "description": "The name of the corpus",
+                    "type": "string"
+                },
+                "author": {
+                    "description": "The author(s) of the corpus",
+                    "type": "string"
+                },
+                "date": {
+                    "description": "The date of the corpus",
+                    "type": "string"
+                },
+                "version": {
+                    "description": "The version of the corpus",
+                    "type": "integer"
+                },
+                "corpusDescription": {
+                    "description": "The description of the corpus",
+                    "type": "string"
+                },
+                "mediaSlots": {
+                    "description": "Multimedia corpora need define at least one media slot",
+                    "type": "object",
+                    "patternProperties": {
+                        "[^ ]+": {
+                            "description": "One audio or video slot; each document defines one media file per slot",
+                            "type": "object",
+                            "properties": {
+                                "mediaType": {
+                                    "type": "string",
+                                    "enum": [
+                                        "audio",
+                                        "video"
+                                    ]
+                                },
+                                "isOptional": {
+                                    "type": "boolean",
+                                    "description": "Whether a document can provide no media file for this slot"
+                                }
+                            },
+                            "required": [
+                                "mediaType"
+                            ]
+                        }
+                    }
+                }
+            },
+            "required": [
+                "name",
+                "author",
+                "date",
+                "version",
+                "corpusDescription"
+            ]
+        },
+        "firstClass": {
+            "description": "The names/aliases of the three core entity types (token, segment, layer) needed in all corpora",
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string",
+                    "description": "The name of the token-level entity type in this corpus"
+                },
+                "segment": {
+                    "type": "string",
+                    "description": "The name of the segment-level entity type in this corpus"
+                },
+                "document": {
+                    "type": "string",
+                    "description": "The name of the document-level entity type in this corpus"
+                }
+            },
+            "required": [
+                "token",
+                "segment",
+                "document"
+            ]
+        },
+        "layer": {
+            "description": "The entity types defined in this corpus",
+            "type": "object",
+            "patternProperties": {
+                ".+[@:].+": {
+                    "type": "object",
+                    "properties": {
+                        "partOf": {
+                            "type": "string"
+                        },
+                        "attributes": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "object",
+                                "$ref": "#/$defs/attribute"
+                            }
+                        }
+                    },
+                    "required": [
+                        "partOf",
+                        "attributes"
+                    ]
+                },
+                "^[^@:]+$": {
+                    "type": "object",
+                    "anyOf": [
+                        {
+                            "type": "object",
+                            "properties": {
+                                "abstract": {
+                                    "description": "Whether this entity type is just an abstract layer",
+                                    "type": "boolean"
+                                },
+                                "layerType": {
+                                    "description": "Spans contain other entity types whereas units are basic",
+                                    "type": "string",
+                                    "enum": ["span","unit"]
+                                },
+                                "contains": {
+                                    "description": "Another entity type (layer) contained in this one",
+                                    "type": "string"
+                                },
+                                "anchoring": {
+                                    "description": "Whether this entity type is anchored to a character, audio or visual axis",
+                                    "type": "object",
+                                    "properties": {
+                                        "stream": {
+                                            "description": "Whether this entity type is anchored to a character axis",
+                                            "type": "boolean"
+                                        },
+                                        "time": {
+                                            "description": "Whether this entity type is anchored to a temporal axis",
+                                            "type": "boolean"
+                                        },
+                                        "location": {
+                                            "description": "Whether this entity type is anchored to a visual axis",
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "required": [
+                                        "location",
+                                        "stream",
+                                        "time"
+                                    ]
+                                },
+                                "attributes": {
+                                    "description": "The attributes on this entity type",
+                                    "type": "object",
+                                    "properties": {
+                                        "meta": {
+                                            "description": "Attributes represented as meta attributes",
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "object",
+                                                "$ref": "#/$defs/attribute"
+                                            }
+                                        }
+                                    },
+                                    "patternProperties": {
+                                        "^(source|target)$": {
+                                            "type": "object",
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string"
+                                                },
+                                                "entity": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "additionalProperties": {
+                                        "type": "object",
+                                        "$ref": "#/$defs/attribute"
+                                    }
+                                }
+                            },
+                            "required": [
+                                "layerType"
+                            ]
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "layerType": {
+                                    "type": "string",
+                                    "pattern": "^relation$"
+                                },
+                                "abstract": {
+                                    "type": "boolean"
+                                },
+                                "attributes": {
+                                    "type": "object",
+                                    "properties": {
+                                        "source": {
+                                            "type": "object",
+                                            "$ref": "#/$defs/relation"
+                                        },
+                                        "target": {
+                                            "type": "object",
+                                            "$ref": "#/$defs/relation"
+                                        }
+                                    },
+                                    "additionalProperties": {
+                                        "type": "object",
+                                        "$ref": "#/$defs/attribute"
+                                    },
+                                    "required": [
+                                        "source",
+                                        "target"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "layerType",
+                                "attributes"
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "partitions": {
+            "type": "object",
+            "properties": {
+                "values": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "globalAttributes": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "object",
+                "$ref": "#/$defs/attribute"
+            }
+        }
+    },
+    "required": [
+        "meta",
+        "firstClass",
+        "layer"
+    ]
+}

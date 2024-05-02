@@ -1,37 +1,118 @@
 [project]
 name = "lcpcli"
-version = "0.1.2"
+dynamic = [ "version" ]
+
 authors = [
-  { name="Jeremy Zehr", email="jeremy.zehr@uzh.ch" },
+  { name = "Danny McDonald", email = "daniel.mcdonald@uzh.ch" },
+  { name = "Igor Mustač", email = "igor.mustac@uzh.ch" },
+  { name = "Jeremy Zehr", email = "jeremy.zehr@uzh.ch" },
+  { name = "Jonathan Schaber", email = "jeremy.schaber@uzh.ch" },
 ]
-description = "Helper for converting CONLLU files and uploading the corpus to LCP"
+description = "Helper for converting CONLLU files and uploading the corpus to LiRI Corpus Platform (LCP)"
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
 ]
-keywords=["corpus", "linguistics", "corpora", "conll", "tei", "vert"]
-dynamic = ["dependencies"]
-
-[tool.setuptools.package-dir]
-"corpert" = "corpert/corpert/"
-"lcp_upload" = "lcp-upload/lcp_upload/"
-
-[tool.setuptools]
-packages = ["lcpcli", "corpert", "corpert.parsers", "lcp_upload"]
-
-[tool.setuptools.dynamic]
-dependencies = {file = ["corpert/requirements.txt","lcp-upload/requirements.txt"]}
-
-[tool.setuptools.package-data]
-'corpert' = ['*.json']
+keywords = [ "corpus", "linguistics", "corpora", "CONLL", "TEI", "VERT" ]
+license = { text = "MIT" }
 
 [project.urls]
-Homepage = "https://gitlab.uzh.ch/LiRI/projects/lcpcli"
-Issues = "https://gitlab.uzh.ch/LiRI/projects/lcpcli/-/issues"
+Homepage = "https://github.com/liri-uzh/lcpcli/issues"
+Issues = "https://github.com/liri-uzh/lcpcli/issues"
 
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "lcpcli/__init__.py"
+
+[tool.hatch.build]
+packages = [ "lcpcli" ]
+skip-excluded-dirs = true
+reproducible = false
+
+[project.scripts]
+lcpcli = "lcpcli.lcpcli:run"
+# not sure these are needed:
+lcp-upload = "lcpcli.lcp_upload:run"
+corpert = "lcpcli.corpert:run"
+
+dependencies = [
+  "jsonpickle>=3.0",
+  "jsonschema>=4.21",
+  "lupa>=1.13",
+  "lxml>=4.7.1",
+  "py7zr>=0.20.5",
+  "requests>=2.30.0",
+  "tqdm>=4.65.0",
+  "types-requests>=2.30.0.0",
+  "types-tqdm>=4.65.0.1",
+  "xmltodict>=0.13",
+]
+#[tool.hatch.metadata]
+#allow-direct-references = true
+
+[tool.hatch.envs.default]
+dependencies = ["black", "mypy"]
+
+[tool.hatch.envs.default.scripts]
+format-check = [
+  "black --version",
+  "black --check --diff .",
+]
+format = [
+  "black .",
+  "format-check",
+]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+
+[tool.hatch.build.targets.sdist]
+include-only = [
+  "lcpcli",
+  "lcpcli/data/lcp_corpus_template.json",
+]
+
+[tool.hatch.build.targets.wheel]
+include-only = [
+  "lcpcli",
+  "lcpcli/data/lcp_corpus_template.json",
+]
+
+[tool.hatch.envs.default.scripts]
+format-check = [
+    "black --version",
+    "black --check --diff .",
+]
+format = [
+    "black .",
+    "format-check",
+]
+typecheck = [
+    "mypy lcpcli --install-types --non-interactive",
+]
+
+# todo: add if/when typing all fixed
+#[tool.hatch.build.hooks.mypyc]
+#dependencies = [
+#  "hatch-mypyc"
+#]
+#[tool.hatch.build.targets.wheel.hooks.mypyc]
+#dependencies = ["hatch-mypyc"]
+#include = ["lcpvian"]
+#exclude = [
+#  "lcpvian/__main__.py",
+#  "lcpvian/nomypypy",
+#]
+
+#[build.targets.wheel.hooks.mypyc.options]
+#opt_level = "3"
+

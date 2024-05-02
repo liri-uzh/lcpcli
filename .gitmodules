@@ -1,6 +1,0 @@
-[submodule "lcp-upload"]
-	path = lcp-upload
-	url = git@gitlab.uzh.ch:LiRI/projects/lcp-upload.git
-[submodule "corpert"]
-	path = corpert
-	url = git@gitlab.uzh.ch:LiRI/projects/corpert.git
