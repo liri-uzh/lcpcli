@@ -61,20 +61,6 @@ dependencies = [
 [tool.hatch.envs.default]
 dependencies = ["black", "mypy"]
 
-[tool.hatch.envs.default.scripts]
-format-check = [
-  "black --version",
-  "black --check --diff .",
-]
-format = [
-  "black .",
-  "format-check",
-]
-
-[tool.mypy]
-python_version = "3.11"
-ignore_missing_imports = true
-
 [tool.hatch.build.targets.sdist]
 include-only = [
   "lcpcli",
@@ -99,6 +85,11 @@ format = [
 typecheck = [
     "mypy lcpcli --install-types --non-interactive",
 ]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+
 
 # todo: add if/when typing all fixed
 #[tool.hatch.build.hooks.mypyc]
