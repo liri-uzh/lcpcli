@@ -1,8 +1,9 @@
 import os
 import shutil
 
+from collections.abc import Callable
 from inspect import signature
-
+from typing import Any
 
 from .corpert import Corpert
 from .lcp_upload import lcp_upload
@@ -15,71 +16,61 @@ class Lcpcli:
         self.args = args
         self.kwargs = kwargs
 
-    def __call__(self, *args, **kwargs):
+    def __new__(cls, *args, **kwargs):
         """
-        Just allows us to do Lcpcli(**kwargs)()
+        Just allows us to do Lcpcli(**kwargs)
         """
-        return self.run(*args, **kwargs)
+        inst = super().__new__(cls)
+        inst.__init__(*args, **kwargs)
+        return inst.run()
+
+    def _get_kwargs(self, func: Callable) -> dict[str, Any]:
+        """
+        Helper to get the arguments for `func` from self.kwargs
+        """
+        allowed = set(signature(func).parameters)
+        return {k: v for k, v in self.kwargs.items() if k in allowed}
 
     def run(self) -> None:
 
         upload = self.kwargs.get("api_key") and self.kwargs.get("secret")
-        corpert = None
+        corpert: Corpert | None = None
 
-        if self.kwargs.get("content"):
-            self.kwargs["content"] = os.path.abspath(self.kwargs["content"])
-
-            corpert_signature = signature(Corpert.__init__)
-            corpert_kwargs = {
-                k: v
-                for k, v in self.kwargs.items()
-                if k in corpert_signature.parameters
-            }
-            corpert = Corpert(**corpert_kwargs)
-
+        if cont := self.kwargs.get("content"):
+            self.kwargs["content"] = os.path.abspath(cont)
+            corpert = Corpert(**self._get_kwargs(Corpert.__init__))
             corpert.run()
 
-        if upload:
+        if not upload:
+            return None
 
-            if corpert and self.kwargs.get("mode", "") == "upload":
-                path = self.kwargs.get("output", os.path.dirname(corpert._path))
+        if corpert and self.kwargs.get("mode", "") == "upload":
+            path = self.kwargs.get("output", os.path.dirname(corpert._path))
 
-                assert next(
-                    (f for f in os.listdir(path) if f.endswith(".json")), None
-                ), FileNotFoundError(f"No JSON file found in {path}")
+            if not any(i.endswith(".json") for i in os.listdir(path)):
+                raise FileNotFoundError(f"No JSON file found in {path}")
 
-                output_dir = os.path.join(path, "_upload")
-                if not os.path.isdir(output_dir):
-                    os.mkdir(output_dir)
-                json = ""
-                for f in os.listdir(path):
-                    if f.endswith(".csv"):
-                        os.rename(os.path.join(path, f), os.path.join(output_dir, f))
-                    elif f.endswith(".json") and not json:
-                        shutil.copy(os.path.join(path, f), os.path.join(output_dir, f))
-                self.kwargs["corpus"] = output_dir
-                print("corpert._path", output_dir)
+            output_dir = os.path.join(path, "_upload")
+            os.makedirs(output_dir, exist_ok=True)
+            json = ""
+            for f in os.listdir(path):
+                if f.endswith(".csv"):
+                    os.rename(os.path.join(path, f), os.path.join(output_dir, f))
+                elif f.endswith(".json") and not json:
+                    shutil.copy(os.path.join(path, f), os.path.join(output_dir, f))
+            self.kwargs["corpus"] = output_dir
 
-            assert self.kwargs.get("corpus"), SyntaxError("No corpus found to upload")
+        if not self.kwargs.get("corpus"):
+            raise ValueError("No corpus found to upload")
 
-            lcp_upload_signature = signature(lcp_upload)
-            lcp_upload_kwargs = {
-                k: v
-                for k, v in self.kwargs.items()
-                if k in lcp_upload_signature.parameters
-            }
-
-            # print("lcp_upload_kwargs", lcp_upload_kwargs)
-
-            lcp_upload(**lcp_upload_kwargs)
+        return lcp_upload(**self._get_kwargs(lcp_upload))
 
 
 def run() -> None:
     """
     pyproject.toml likes a function callable entrypoint
     """
-    kwargs = _parse_cmd_line()
-    Lcpcli(**kwargs).run()
+    Lcpcli(**_parse_cmd_line())
 
 
 if __name__ == "__main__":
