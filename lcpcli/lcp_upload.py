@@ -15,13 +15,14 @@ from tqdm import tqdm
 
 from .cli import _parse_cmd_line
 
-CREATE_URL = "https://lcp.test.linguistik.uzh.ch/create"
-UPLOAD_URL = "https://lcp.test.linguistik.uzh.ch/upload"
+CREATE_URL = "https://lcp.linguistik.uzh.ch/create"
+UPLOAD_URL = "https://lcp.linguistik.uzh.ch/upload"
 CREATE_URL_TEST = "http://localhost:9090/create"
 UPLOAD_URL_TEST = "http://localhost:9090/upload"
 
 VALID_EXTENSIONS = ("csv",)
 COMPRESSED_EXTENSIONS = ("zip", "tar", "tar.gz", "tar.xz", "7z")
+MEDIA_EXTENSIONS = ("mp3", "mp4", "wav", "ogg")
 
 
 def lcp_upload(
@@ -32,6 +33,7 @@ def lcp_upload(
     project: str | None = None,
     vian: bool = False,
     live: bool = False,
+    to: str = "",
     **kwargs,
 ) -> None:
 
@@ -134,6 +136,13 @@ def lcp_upload(
     #    os.remove(template)
     jso = {"template": template_data}
 
+    has_media = template_data and template_data.get("meta", {}).get("mediaSlots")
+
+    if has_media:
+        assert os.path.isdir(corpus), NotImplementedError(
+            "Multimedia corpora files must be unzipped and contain a media folder"
+        )
+
     default = "vian" if vian else "lcp"
     this_corpus_projects = [default]
     if project:
@@ -142,12 +151,81 @@ def lcp_upload(
 
     print("Sending template...")
     url = CREATE_URL if live else CREATE_URL_TEST
+    if to:
+        url = f"{to}/create"
     resp = requests.post(url, headers=headers, json=jso)  # type: ignore
     data = resp.json()
-    ret = check_template_and_send(data, headers, jso, corpus, base, filt, live)
+    ret = check_template_and_send(data, headers, jso, corpus, base, filt, live, to=to)
     if not ret:
         return
     monitor_upload(*ret)
+
+    status, error = ("finished", "")
+    if has_media:
+        status, error = send_media(data, headers, jso, corpus, base, filt, live, to=to)
+
+    if status != "finished":
+        print(f"Upload failed: {error}")
+    else:
+        print("Corpus uploaded.")
+
+
+def send_media(
+    data: dict[str, Any],
+    headers: dict[str, Any],
+    jso: dict[str, Any],
+    corpus: str,
+    base: str,
+    filt: str | None,
+    live: bool,
+    to: str = "",
+) -> tuple[str, str]:
+    """
+    Poll /schema to check if schema is done, then send data
+    """
+    project = data.get("project")
+    target = data.get("target")
+    user_id = data.get("user_id")
+    job = data.get("job")
+    if not project or not target or not user_id or not job:
+        print(f"Failed:")
+        for k, v in data.items():
+            print(f"{k}: {v}")
+        return ("failed", "Missing project, target, user_id or job in payload")
+
+    time.sleep(3)
+
+    jso.pop("check", None)
+    jso["project"] = project
+    jso["user_id"] = user_id
+    jso["job"] = data["job"]
+    jso["media"] = True
+
+    media_path = os.path.join(base, "media")
+    assert os.path.isdir(media_path), FileNotFoundError(
+        f"No 'media' subfolder found at '{media_path}'"
+    )
+
+    files = {
+        os.path.splitext(p)[0]: open(os.path.join(media_path, p), "rb")
+        for p in os.listdir(media_path)
+    }
+    if filt:
+        files = {
+            k: v for k, v in files.items() if filt in k and k.endswith(MEDIA_EXTENSIONS)
+        }
+
+    print("Sending media data...")
+
+    url = UPLOAD_URL if live else UPLOAD_URL_TEST
+    if to:
+        url = f"{to}/upload"
+    resp = requests.post(url, params=jso, headers=headers, files=files)  # type: ignore
+
+    time.sleep(2)
+
+    data = resp.json()
+    return (data.get("status", "failed"), data.get("error", ""))
 
 
 def check_template_and_send(
@@ -158,6 +236,7 @@ def check_template_and_send(
     base: str,
     filt: str | None,
     live: bool,
+    to: str = "",
 ) -> tuple:
     """
     Poll /schema to check if schema is done, then send data
@@ -194,6 +273,7 @@ def check_template_and_send(
         files = {
             os.path.splitext(p)[0]: open(os.path.join(base, p), "rb")
             for p in os.listdir(base)
+            if os.path.isfile(os.path.join(base, p))
         }
         if filt:
             files = {
@@ -207,6 +287,8 @@ def check_template_and_send(
     print("Sending data...")
 
     url = UPLOAD_URL if live else UPLOAD_URL_TEST
+    if to:
+        url = f"{to}/upload"
     resp = requests.post(url, params=jso, headers=headers, files=files)  # type: ignore
 
     time.sleep(5)

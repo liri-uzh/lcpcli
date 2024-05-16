@@ -90,7 +90,6 @@ class CONLLUParser(Parser):
                 current_sentence["text"].append(line)
 
         sentence = None
-        has_frame_range = False
         if current_sentence["text"]:
             sentence = Segment()
             for t in current_sentence["text"]:
@@ -169,8 +168,8 @@ class CONLLUParser(Parser):
                         continue
                     sentence.attributes[attr_name] = Text(attr_name, meta.pop(attr_name))
             if meta:
-                if name.lower() in segment_containers:
-                    sentence.attributes[name] = Text(name, meta.pop(name))
+                # if name.lower() in segment_containers:
+                #     sentence.attributes[name] = Text(name, meta.pop(name))
                 sentence.attributes["meta"] = Meta("meta", meta)
 
         if new_doc:

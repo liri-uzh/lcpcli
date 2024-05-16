@@ -139,6 +139,8 @@ class Parser(abc.ABC):
                     continue
                 tokens[hid]['nested_set'].add(tokens[token_id]['nested_set'])
             anchor_right = table.anchor_right
+            if not nested_set_of_previous_head:
+                import pdb; pdb.set_trace()
             nested_set_of_previous_head.compute_anchors()
             for id in nested_set_of_previous_head.all_ids:
                 nested_set = tokens[id]['nested_set']
@@ -369,6 +371,7 @@ class Parser(abc.ABC):
                 col_names[f"{segName}_id"] = None
                 token_table.write( [c for c in col_names] )
 
+            print("segment",segment.id,"meta", segment.attributes.get("meta",Meta("dummy","dummy")).value)
             for token in segment.tokens:
                 cols = [ str(token_table.cursor) ]
                 for attr_name in non_null_attributes:

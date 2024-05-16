@@ -100,6 +100,13 @@ def _parse_cmd_line():
         help="Upload to VIAN instead of LCP?",
         **BOOL_KWARGS
     )
+    parser.add_argument(
+        "-t",
+        "--to",
+        type=str,
+        required=False,
+        help="URL of the LCP instance receiving the corpus.",
+    )
     
     kwargs = vars(parser.parse_args())
     kwargs["content"] = kwargs.pop("input", "")

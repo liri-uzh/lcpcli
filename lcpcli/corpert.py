@@ -10,7 +10,6 @@ from .parsers.json import JSONParser
 from .cli import _parse_cmd_line
 from .utils import default_json
 
-from importlib.resources import files
 from jsonschema import validate
 from pathlib import Path
 
@@ -220,7 +219,8 @@ class Corpert:
                 json_obj = default_json(
                     next(reversed(self._path.split(os.path.sep))) or "Anonymous Project"
                 )
-            schema_path = os.path.join(__file__, "data", "lcp_corpus_template.json")
+            parent_dir = os.path.dirname(__file__)
+            schema_path = os.path.join(parent_dir, "data", "lcp_corpus_template.json")
             with open(schema_path) as schema_file:
                 validate(json_obj, json.loads(schema_file.read()))
                 print("validated json schema")
