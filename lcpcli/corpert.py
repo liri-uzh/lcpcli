@@ -1,6 +1,7 @@
 import codecs
 import json
 import os
+import shutil
 
 from .parsers.conllu import CONLLUParser
 from .parsers.vert import VERTParser
@@ -228,6 +229,13 @@ class Corpert:
             aligned_entities = {}
             aligned_entities_segment = {}
             firstClass = json_obj.get("firstClass", {})
+            # Detect the global attributes files and exclude them from the list of files to process
+            for glob_attr in json_obj.get("globalAttributes", {}):
+                filename = f"global_attribute_{glob_attr}.csv"
+                source = os.path.join(self._path, filename)
+                ignore_files.add(source)
+                if os.path.exists(source):
+                    shutil.copy(source, os.path.join(self.output or "./", filename))
             # Parse the input files that are not at the token, segment or document level
             for layer, properties in json_obj.get("layer", {}).items():
                 if layer in firstClass.values():

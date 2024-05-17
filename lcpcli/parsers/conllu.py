@@ -19,9 +19,20 @@ import re
 import uuid
 
 from inspect import isgenerator
+from typing import cast
 
 from ._parser import Parser
-from ..utils import Attribute, Categorical, CustomDict, Dependency, Document, Meta, Segment, Text, Token
+from ..utils import (
+    Attribute,
+    Categorical,
+    CustomDict,
+    Dependency,
+    Document,
+    Meta,
+    Segment,
+    Text,
+    Token,
+)
 
 
 FEATURES = [
@@ -41,36 +52,37 @@ FEATURES = [
 class CONLLUParser(Parser):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.word      = CustomDict()
-        self.lemma     = CustomDict()
-        self.ufeats    = CustomDict()
+        self.word = CustomDict()
+        self.lemma = CustomDict()
+        self.ufeats = CustomDict()
         self.jsonbMisc = CustomDict()
-        self.xpos      = set()
-        self.cur_idx   = 1
-        self.cur_word  = 1
-        self.cur_seg   = uuid.uuid4()
-        self.left      = 1
+        self.xpos = set()
+        self.cur_idx = 1
+        self.cur_word = 1
+        self.cur_seg = uuid.uuid4()
+        self.left = 1
 
         self.start_idx = re.compile(r"^\[\d+")
-        self.end_idx   = re.compile(r"\d+\)$")
-        self.text_id   = -1
+        self.end_idx = re.compile(r"\d+\)$")
+        self.text_id = -1
 
         self.n_doc = 0
 
         self._features = FEATURES
 
-
     @property
     def right(self):
         return self.left + 1
 
-
-    def parse_sentence(self, sentence_lines, config={}) -> tuple[Document | None, Segment | None]:
+    def parse_sentence(
+        self, sentence_lines, config={}
+    ) -> tuple[Segment | None, Document | None]:
         """
         Take a list of ConLLU lines (comments + tokens) and output (sentence, new_doc | None)
         """
         new_doc = None
-        current_sentence = {"meta": {}, "text": []}
+        current_sentence: dict = {"meta": {}, "text": []}
+        mediaSlots = self.config.get("meta", {}).get("mediaSlots", {})
         for line in sentence_lines:
             if re.match(r"# newdoc", line):
                 if not new_doc:
@@ -79,7 +91,13 @@ class CONLLUParser(Parser):
                 if match := re.match(r"# newdoc id = (.+)", line):
                     new_doc["id"] = match[1]
                 elif match := re.match(r"# newdoc ([^=]+) = (.+)", line):
-                    new_doc["meta"][match[1]] = match[2]
+                    key = match[1].strip()
+                    value = match[2].strip()
+                    if mediaSlots and key in mediaSlots:
+                        new_doc["media"] = new_doc.get("media", {})
+                        new_doc["media"][key] = value
+                    else:
+                        new_doc["meta"][key] = value
             elif match := re.match(r"# sent_id = (.+)", line):
                 current_sentence["id"] = match[1]
             elif match := re.match(r"#\s+([^=]+)\s+= (.+)", line):
@@ -88,6 +106,15 @@ class CONLLUParser(Parser):
                 line = line.split("\t")
                 line = {k: v for k, v in zip(self._features, line)}
                 current_sentence["text"].append(line)
+
+        if new_doc:
+            for media_name, attribs in mediaSlots.items():
+                assert (
+                    media_name in new_doc.get("media", {})
+                    or attribs.get("isOptional", False) is not False
+                ), KeyError(
+                    f"Filename missing for required media '{media_name}' in current document"
+                )
 
         sentence = None
         if current_sentence["text"]:
@@ -100,10 +127,10 @@ class CONLLUParser(Parser):
                         v = None
                     if k == "id":
                         token.id = v
-                    elif k in ("form","lemma"):
-                        token.attributes[k] = Text(k,v)
-                    elif k in ("upos","xpos"):
-                        token.attributes[k] = Categorical(k,v)
+                    elif k in ("form", "lemma"):
+                        token.attributes[k] = Text(k, v)
+                    elif k in ("upos", "xpos"):
+                        token.attributes[k] = Categorical(k, v)
                     elif k == "feats":
                         v = v or ""
                         d = {}
@@ -112,14 +139,18 @@ class CONLLUParser(Parser):
                                 continue
                             pk, pv = pkpv.split("=")
                             d[pk.strip()] = pv.strip()
-                        token.attributes['ufeat'] = Meta('ufeat',d)
+                        token.attributes["ufeat"] = Meta("ufeat", d)
                     elif k == "head":
                         if v == "0":
                             v = None
-                        token.attributes["deprel"] = Dependency("deprel",v)
+                        token.attributes["deprel"] = Dependency("deprel", v)
                     elif k == "deprel":
-                        token.attributes["head"] = token.attributes.get("deprel", Dependency("deprel",None))
-                        token.attributes["head"].label = v
+                        dep: Dependency = cast(
+                            Dependency,
+                            token.attributes.get("deprel", Dependency("deprel", None)),
+                        )
+                        dep.label = v
+                        token.attributes["head"] = dep
                     elif k == "misc":
                         if not v or "=" not in v:
                             continue
@@ -130,15 +161,17 @@ class CONLLUParser(Parser):
                             pk, pv = pkpv.split("=")
                             pk = pk.strip()
                             pv = pv.strip()
-                            if pk in ("start","end"):
-                                token.frame_range = token.frame_range or [0,0]
-                                token.frame_range[0 if pk=="start" else 1] = int(25.0 * float(pv))
+                            if pk in ("start", "end"):
+                                token.frame_range = token.frame_range or [0, 0]
+                                token.frame_range[0 if pk == "start" else 1] = int(
+                                    25.0 * float(pv)
+                                )
                                 has_frame_range = True
                             else:
                                 misc[pk] = str(pv)
                         token.attributes["misc"] = Meta("misc", misc)
                     else:
-                        token.attributes[k] = Text(k,v)
+                        token.attributes[k] = Text(k, v)
 
             # if has_frame_range:
             #     assert all(t.frame_range is not None for t in sentence.tokens), AttributeError("Some tokens miss start-end time information")
@@ -148,41 +181,49 @@ class CONLLUParser(Parser):
             if config:
                 # If a config was provided, pop any entry from meta that's listed as a main attribute
                 seg_layer = config.get("firstClass", {}).get("segment", "")
-                seg_config = config.get("layer", {}).get(seg_layer, {}).get("attributes", {})
+                seg_config = (
+                    config.get("layer", {}).get(seg_layer, {}).get("attributes", {})
+                )
                 segment_containers = [
                     layer.lower()
                     for layer, props in config.get("layer", {}).items()
-                    if props.get("layerType", "") == "span" and props.get("contains", "") == seg_layer
+                    if props.get("layerType", "") == "span"
+                    and props.get("contains", "") == seg_layer
                 ]
                 for attr_name in seg_config:
                     name = attr_name
-                    if name+"_id" in meta:
+                    if name + "_id" in meta:
                         name = name + "_id"
                     elif name not in meta:
                         continue
                     a = meta.pop(name)
                     sentence.attributes[name] = Attribute(name, a)
                 for seg_container in segment_containers:
-                    attr_name = next( (k for k in meta.keys() if k.lower() == seg_container) , None )
+                    attr_name = next(
+                        (k for k in meta.keys() if k.lower() == seg_container), None
+                    )
                     if attr_name is None:
                         continue
-                    sentence.attributes[attr_name] = Text(attr_name, meta.pop(attr_name))
+                    sentence.attributes[attr_name] = Text(
+                        attr_name, meta.pop(attr_name)
+                    )
             if meta:
                 # if name.lower() in segment_containers:
                 #     sentence.attributes[name] = Text(name, meta.pop(name))
                 sentence.attributes["meta"] = Meta("meta", meta)
 
+        ret_doc: Document | None = None
         if new_doc:
-            doc = Document()
+            ret_doc = Document()
             if id := new_doc.get("id"):
                 new_doc["meta"]["name"] = id
-            doc.attributes["meta"] = Meta("meta", new_doc["meta"])
-            doc.first_sentence = sentence
-            new_doc = doc
+            ret_doc.attributes["meta"] = Meta("meta", new_doc["meta"])
+            if new_doc.get("media"):
+                ret_doc.attributes["media"] = Meta("media", new_doc["media"])
+            # doc.first_sentence = sentence
 
-        return (sentence, new_doc)
+        return (sentence, ret_doc)
         # return (current_sentence, new_doc)
-
 
     def parse_generator(self, reader, config={}):
         checked_first_line_for_conllu_plus = False
@@ -190,7 +231,9 @@ class CONLLUParser(Parser):
         while line := reader.readline():
             l = line.strip()
             if l:
-                if not checked_first_line_for_conllu_plus and l.startswith("# global.columns = "):
+                if not checked_first_line_for_conllu_plus and l.startswith(
+                    "# global.columns = "
+                ):
                     self._features = [f.lower() for f in l[19:].split()]
                 else:
                     sentence_lines.append(line)
@@ -204,10 +247,9 @@ class CONLLUParser(Parser):
         if sentence_lines:
             yield self.parse_sentence(sentence_lines, config=config)
 
-
     def parse(self, content):
         """
-        When iterator is True, yield ({id,meta,text},None|{id,meta}) -- content should have a readline method and 
+        When iterator is True, yield ({id,meta,text},None|{id,meta}) -- content should have a readline method and
         When iterator is False, return a writable string
         """
 
@@ -229,19 +271,20 @@ class CONLLUParser(Parser):
                 if current_sentences:
                     current_document["sentences"] = current_sentences
                     self.n_doc += 1
-                    conllu_parsed[current_document.pop("id",self.n_doc)] = current_document
+                    conllu_parsed[current_document.pop("id", self.n_doc)] = (
+                        current_document
+                    )
                 current_document = new_doc
                 current_sentences = {}
 
-            current_sentences[sentence.pop("id", n_sent := n_sent+1)] = sentence
+            current_sentences[sentence.pop("id", n_sent := n_sent + 1)] = sentence
 
         if current_sentences:
             current_document["sentences"] = current_sentences
             self.n_doc += 1
-            conllu_parsed[current_document.pop("id",self.n_doc)] = current_document
+            conllu_parsed[current_document.pop("id", self.n_doc)] = current_document
 
         return conllu_parsed
-
 
     def doc_meta(self, id, meta):
         """
@@ -255,7 +298,6 @@ class CONLLUParser(Parser):
                 continue
             lines.append(f"# newdoc {key} = {text}")
         return f"\n".join(lines)
-
 
     def combine(self, content):
         """
@@ -271,7 +313,6 @@ class CONLLUParser(Parser):
             conllu_lines.append(self.write(doc_content.get("sentences", {})))
 
         return f"\n".join(conllu_lines)
-
 
     def write_sentence(self, sentence):
         lines = []
@@ -289,16 +330,17 @@ class CONLLUParser(Parser):
         if not sent_text:
             return lines
 
-        lines.append(f"# text = {' '.join([token.get('form',' ') for token in sent_text])}\n")
+        lines.append(
+            f"# text = {' '.join([token.get('form',' ') for token in sent_text])}\n"
+        )
 
         for n, item in enumerate(sent_text):
             # cols = [n+1, *item[1:]]
             # cols = [(str(i) if i else '_') for i in cols]
             # lines.append(f"\t".join(cols))
-            lines.append(f"\t".join([item.get(f,'_') for f in self._features]))
+            lines.append(f"\t".join([item.get(f, "_") for f in self._features]))
 
         return lines
-
 
     def write_generator(self, generator):
         self.n_doc = 0
@@ -310,9 +352,11 @@ class CONLLUParser(Parser):
             if doc:
                 self.n_doc += 1
                 lines.append("# newdoc id = {}".format(doc.pop("id", self.n_doc)))
-                for k,v in doc.get("meta", {}).items():
-                    lines.append("# newdoc {} = {}".format(k,v))
-            lines.append("# sent_id = {}\n".format(sentence.pop("id", n_sent := n_sent+1)))
+                for k, v in doc.get("meta", {}).items():
+                    lines.append("# newdoc {} = {}".format(k, v))
+            lines.append(
+                "# sent_id = {}\n".format(sentence.pop("id", n_sent := n_sent + 1))
+            )
             lines += self.write_sentence(sentence)
             yield "".join(lines)
 
@@ -326,7 +370,7 @@ class CONLLUParser(Parser):
         for sent_id, sent_data in content.items():
 
             if conllu_lines:
-                conllu_lines.append(f"") # Add an empty line
+                conllu_lines.append(f"")  # Add an empty line
 
             conllu_lines.append(f"# sent_id = {sent_id}\n")
             conllu_lines += self.write_sentence(sent_data)

@@ -2,6 +2,7 @@ import os
 
 from setuptools import setup
 
+
 def read(fname):
     """
     Helper to read README
@@ -11,12 +12,12 @@ def read(fname):
 
 setup(
     name="lcpcli",
-    version="0.0.1",
+    version="0.1.4",
     description="CLI tool combining LCP Upload and LCP Corpert",
     long_description=read("README.md"),
     long_description_content_type="text/markdown",
     url="",
-    author="Jeremy Zehr and Jonathan Schaber",
+    author="Linguistic Research Infrastructure UZH",
     include_package_data=False,
     zip_safe=True,
     # packages=["lcpcli","lcp-upload","corpert"],

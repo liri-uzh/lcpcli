@@ -7,7 +7,7 @@ import os
 import sys
 import time
 
-from typing import Any
+from typing import Any, cast
 
 import requests
 
@@ -15,8 +15,8 @@ from tqdm import tqdm
 
 from .cli import _parse_cmd_line
 
-CREATE_URL = "https://lcp.linguistik.uzh.ch/create"
-UPLOAD_URL = "https://lcp.linguistik.uzh.ch/upload"
+CREATE_URL = "https://lcp.test.linguistik.uzh.ch/create"
+UPLOAD_URL = "https://lcp.test.linguistik.uzh.ch/upload"
 CREATE_URL_TEST = "http://localhost:9090/create"
 UPLOAD_URL_TEST = "http://localhost:9090/upload"
 
@@ -34,6 +34,7 @@ def lcp_upload(
     vian: bool = False,
     live: bool = False,
     to: str = "",
+    check_only: bool = False,
     **kwargs,
 ) -> None:
 
@@ -136,12 +137,45 @@ def lcp_upload(
     #    os.remove(template)
     jso = {"template": template_data}
 
-    has_media = template_data and template_data.get("meta", {}).get("mediaSlots")
+    has_media = template_data and template_data.get("meta", {}).get("mediaSlots", {})
 
     if has_media:
         assert os.path.isdir(corpus), NotImplementedError(
-            "Multimedia corpora files must be unzipped and contain a media folder"
+            "Multimedia corpora must be in an unzipped folder"
         )
+        media_path = os.path.join(corpus, "media")
+        assert os.path.isdir(media_path), NotImplementedError(
+            "The media files should be placed inside a 'media' subfolder"
+        )
+        doc_name = cast(dict, template_data)["firstClass"]["document"]
+        with open(os.path.join(corpus, f"{doc_name.lower()}.csv"), "r") as doc_file:
+            media_ncol = -1
+            nline = 0
+            while True:
+                line = doc_file.readline()
+                nline += 1
+                if not line:
+                    break
+                cols = line.rstrip().split("\t")
+                if media_ncol < 0:
+                    media_ncol = next(n for n, col in enumerate(cols) if col == "media")
+                    continue
+                media_obj = json.loads(cols[media_ncol])
+                for media_name, media_attr in has_media.items():
+                    if media_attr.get("isOptional"):
+                        continue
+                    media_filename = media_obj.get(media_name)
+                    assert media_filename, ReferenceError(
+                        f"No file referenced for '{media_name}' in document line {nline} ({line})"
+                    )
+                    media_filepath = os.path.join(media_path, media_filename)
+                    assert os.path.isfile(media_filepath), FileNotFoundError(
+                        f"File '{media_filename}' not found in {media_path} for document line {nline} ({line})"
+                    )
+
+    if check_only:
+        print("Checks over.")
+        return
 
     default = "vian" if vian else "lcp"
     this_corpus_projects = [default]
@@ -158,14 +192,15 @@ def lcp_upload(
     ret = check_template_and_send(data, headers, jso, corpus, base, filt, live, to=to)
     if not ret:
         return
-    monitor_upload(*ret)
+    if not monitor_upload(*ret):
+        return
 
     status, error = ("finished", "")
     if has_media:
         status, error = send_media(data, headers, jso, corpus, base, filt, live, to=to)
 
     if status != "finished":
-        print(f"Upload failed: {error}")
+        print(f"Media upload failed: {error}")
     else:
         print("Corpus uploaded.")
 
@@ -290,12 +325,14 @@ def check_template_and_send(
     if to:
         url = f"{to}/upload"
     resp = requests.post(url, params=jso, headers=headers, files=files)  # type: ignore
+    print("files", files)
 
     time.sleep(5)
 
     print("Checking corpus validity...")
 
     data = resp.json()
+    print("data", data)
     if "target" not in data:
         print(f"Failed:")
         for k, v in data.items():
@@ -307,7 +344,7 @@ def check_template_and_send(
     return new_url, headers, jso
 
 
-def monitor_upload(new_url: str, headers: dict[str, Any], jso: dict[str, Any]) -> None:
+def monitor_upload(new_url: str, headers: dict[str, Any], jso: dict[str, Any]) -> bool:
     """
     Poll /upload and check the status of a job
     """
@@ -322,6 +359,8 @@ def monitor_upload(new_url: str, headers: dict[str, Any], jso: dict[str, Any]) -
         resp = requests.post(new_url, headers=headers, params=jso)  # type: ignore
         data = resp.json()
 
+        print("monitoring", data)
+
         if data.get("status") != status and data["status"] not in bads:
             for k, v in data.items():
                 if k != "target" and progbar:
@@ -334,12 +373,14 @@ def monitor_upload(new_url: str, headers: dict[str, Any], jso: dict[str, Any]) -
                 progbar.refresh()
                 progbar.close()
                 print(f"Status: {status}")
-            elif progbar and status == "failed":
+            elif status == "failed":
                 print(f"Status: {status}")
-                for k, v in data.items():
-                    if k != "target" and progbar:
-                        progbar.write(f"{k}: {v}")
-            return
+                print(f"Info: {data.get('info','')}")
+                if progbar:
+                    for k, v in data.items():
+                        if k != "target" and progbar:
+                            progbar.write(f"{k}: {v}")
+            return status == "finished"
         stat = "" if not status else status.lower()
         current, tot, text, unit = data.get("progress", "///").split("/", 3)
         if "started" in stat:

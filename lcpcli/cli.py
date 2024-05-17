@@ -15,7 +15,7 @@ def _parse_cmd_line():
     Helper for parsing CLI call and displaying help message
     """
     parser = argparse.ArgumentParser(description="Convert and upload corpus to LCP")
-    
+
     # CORPERT
     parser.add_argument(
         "-i", "--input", type=str, required=False, help="Input file path"
@@ -28,7 +28,8 @@ def _parse_cmd_line():
         nargs="?",
         choices=["normal", "upload"],
         default="normal",
-        help="LCP upload ('upload') or not ('normal', default)")
+        help="LCP upload ('upload') or not ('normal', default)",
+    )
     parser.add_argument(
         "-e", "--extension", type=str, help="Output format when output is a directory"
     )
@@ -47,7 +48,7 @@ def _parse_cmd_line():
         help="Combine into single file?",
         # action=argparse.BooleanOptionalAction,
     )
-    
+
     # LCPUPLOAD
     parser.add_argument(
         "-c",
@@ -90,7 +91,7 @@ def _parse_cmd_line():
         required=False,
         default=False,
         help="Use live system? If false, use test system.",
-        **BOOL_KWARGS
+        **BOOL_KWARGS,
     )
     parser.add_argument(
         "-v",
@@ -98,7 +99,7 @@ def _parse_cmd_line():
         required=False,
         default=False,
         help="Upload to VIAN instead of LCP?",
-        **BOOL_KWARGS
+        **BOOL_KWARGS,
     )
     parser.add_argument(
         "-t",
@@ -107,7 +108,15 @@ def _parse_cmd_line():
         required=False,
         help="URL of the LCP instance receiving the corpus.",
     )
-    
+    parser.add_argument(
+        "-ch",
+        "--check-only",
+        required=False,
+        default=False,
+        help="Use live system? If false, use test system.",
+        **BOOL_KWARGS,
+    )
+
     kwargs = vars(parser.parse_args())
     kwargs["content"] = kwargs.pop("input", "")
     kwargs["template"] = kwargs.pop("json", False)
