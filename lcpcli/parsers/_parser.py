@@ -219,12 +219,12 @@ class Parser(abc.ABC):
                 table.write(entity_col_names)
         table = self._tables[aname_low]
         fk = attribute.value.strip()
-        ce = table.currentEntity
+        ce = table.current_entity
         if fk == ce.get("id", ""):
             # TODO: form will need a lookup table here too
             # if 'form' in ce and 'form' not in self._tables[aname_low]['col_names']:
             #     ce['form'] += token.attributes['form'].value + (' ' if token.spaceAfter else '')
-            table.previousEntity = entity
+            table.previous_entity = entity
             pass
         else:
             if ce:
@@ -270,14 +270,14 @@ class Parser(abc.ABC):
                             #     ce['form'] = token.attributes['form'].value + (' ' if token.spaceAfter else '')
                             ce["range_low"] = str(self.char_range_cur)
                             break
-            table.currentEntity = ce
+            table.current_entity = ce
 
     def close_aligned_entity(self, name, path, aligned_entities={}):
         dummy_entity = EntityType()
         dummy_attribute = Text(name, "dummy")
         self.aligned_entity(dummy_entity, path, dummy_attribute, aligned_entities)
         if name in self._tables:
-            self._tables[name].currentEntity = {}
+            self._tables[name].current_entity = {}
 
     def close_upload_files(self, path="./"):
         if self._tables is None:
@@ -430,7 +430,7 @@ class Parser(abc.ABC):
                         #     self._tables[aname_low] = {
                         #         'file': open(os.path.join(path,f"{aname_low}.csv"), "a"),
                         #         'cursor': 1,
-                        #         'currentEntity': {},
+                        #         'current_entity': {},
                         #         'previousToken': None
                         #     }
                         #     with open(aligned_entities[aname_low]['fn'], "r") as aligned_file:
@@ -445,7 +445,7 @@ class Parser(abc.ABC):
                         #             "\t".join(ne_col_names) + "\n"
                         #         )
                         # fk = attribute.value.strip()
-                        # ce = self._tables[aname_low].get("currentEntity", {})
+                        # ce = self._tables[aname_low].get("current_entity", {})
                         # if fk == ce.get("id", ""):
                         #     # TODO: form will need a lookup table here too
                         #     # if 'form' in ce and 'form' not in self._tables[aname_low]['col_names']:
@@ -484,7 +484,7 @@ class Parser(abc.ABC):
                         #                     #     ce['form'] = token.attributes['form'].value + (' ' if token.spaceAfter else '')
                         #                     ce['range_low'] = str(self.char_range_cur)
                         #                     break
-                        #     self._tables[aname_low]['currentEntity'] = ce
+                        #     self._tables[aname_low]['current_entity'] = ce
 
                     elif isinstance(attribute, Categorical):
                         cols.append(str(attribute.value))
@@ -523,7 +523,7 @@ class Parser(abc.ABC):
                                 [
                                     "head",
                                     "dependent",
-                                    "label",
+                                    "udep",
                                     "left_anchor",
                                     "right_anchor",
                                 ]
@@ -564,6 +564,8 @@ class Parser(abc.ABC):
                     left_frame_range, right_frame_range = token.frame_range
                     left_frame_range += offset_frame_range
                     right_frame_range += offset_frame_range
+                    if right_frame_range <= left_frame_range:
+                        right_frame_range = left_frame_range + 1
                     cols.append(f"[{str(left_frame_range)},{str(right_frame_range)})")
                     if current_document:
                         if current_document.frame_range[0] == 0:
@@ -596,8 +598,11 @@ class Parser(abc.ABC):
             cols = [str(segment.id)]
             cols.append(f"[{char_range_segment_start},{self.char_range_cur-1})")
             if has_frame_range:
+                frame_range_segment_end = self.frame_range_cur
+                if frame_range_segment_end <= frame_range_segment_start:
+                    frame_range_segment_end = frame_range_segment_start + 1
                 cols.append(
-                    f"[{str(frame_range_segment_start)},{str(self.frame_range_cur)})"
+                    f"[{str(frame_range_segment_start)},{str(frame_range_segment_end)})"
                 )
             # Add all segment attributes
             for a in segment.attributes.values():

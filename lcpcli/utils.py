@@ -321,6 +321,8 @@ class Sentence:
                     start, end = frame_range[1].split("|")
                     start = round(25.0 * float(start))
                     end = round(25.0 * float(end.lstrip("end=")))
+                    if end <= start:
+                        end = start + 1
                     token_dict[w_id].append([start, end])
                 jsonbMisc = {}
                 for bit in misc.split("|"):
@@ -400,8 +402,8 @@ class Table:
         self.file = open(self.path, "a")
         self.config = config
         self.cursor = 1
-        self.currentEntity = dict()
-        self.previousEntity = None
+        self.current_entity = dict()
+        self.previous_entity = None
         self.colNames = ([],)
         self.labels = dict()
         self.texts = dict()
@@ -409,9 +411,23 @@ class Table:
         self.anchor_right = 0
         self.non_null_attributes = {}
         self.sep = "\t"
+        self.quote = f"\b"
+        self.trigger_character = "'"
 
     def write(self, row: list):
-        self.file.write(self.sep.join([str(x) for x in row]) + "\n")
+        self.file.write(
+            self.sep.join(
+                [
+                    (
+                        f"{self.quote}{str(x)}{self.quote}"
+                        if self.trigger_character in str(x)
+                        else str(x)
+                    )
+                    for x in row
+                ]
+            )
+            + "\n"
+        )
 
 
 class Attribute:

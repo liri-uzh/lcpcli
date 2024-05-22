@@ -370,6 +370,8 @@ class Corpert:
                                     str(int(times[n] * 25.0) + doc_frames[n])
                                     for n in (0, 1)
                                 ]
+                                if end <= start:
+                                    end = start + 1
                                 output_cols.append(f"[{start},{end})")
                             output_file.write("\t".join(output_cols) + "\n")
 
