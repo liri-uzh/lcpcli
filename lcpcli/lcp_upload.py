@@ -160,7 +160,8 @@ def lcp_upload(
                 if media_ncol < 0:
                     media_ncol = next(n for n, col in enumerate(cols) if col == "media")
                     continue
-                media_obj = json.loads(cols[media_ncol])
+                print("media_col", cols[media_ncol].strip("\b"))
+                media_obj = json.loads(cols[media_ncol].strip("\b"))
                 for media_name, media_attr in has_media.items():
                     if media_attr.get("isOptional"):
                         continue

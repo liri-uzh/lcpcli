@@ -18,6 +18,7 @@ import re
 from ..utils import (
     get_ci,
     Table,
+    LookupTable,
     EntityType,
     Document,
     Categorical,
@@ -103,12 +104,12 @@ class Parser(abc.ABC):
 
         return doc_id, char_range, json.dumps(meta_obj)
 
-    def upload_new_doc(self, doc, table, docName="document"):
+    def upload_new_doc(self, doc, table, doc_name="document"):
         """
         Take a document instance, a character_range cursor and a file handle, and write a line to the file
         """
         meta = doc.attributes.get("meta")
-        col_names = [f"{docName}_id", "char_range"]
+        col_names = [f"{doc_name}_id", "char_range"]
         cols = [
             str(table.cursor),
             f"[{str(doc.char_range_start)},{str(self.char_range_cur-1)})",
@@ -127,11 +128,11 @@ class Parser(abc.ABC):
             if meta._value:
                 col_names.append("meta")
                 cols.append(str(meta.value))
-        mediaSlots = self.config.get("meta", {}).get("mediaSlots", {})
-        if mediaSlots:
+        media_slots = self.config.get("meta", {}).get("mediaSlots", {})
+        if media_slots:
             col_names.append("media")
             media = doc.attributes.get("media", Meta("dymmy", {})).value
-            for name, attribs in mediaSlots.items():
+            for name, attribs in media_slots.items():
                 assert (
                     attribs.get("isOptional") is not False or name in media
                 ), KeyError(
@@ -203,15 +204,26 @@ class Parser(abc.ABC):
             if layer_name
             else {}
         )
+        # Create a table for the entity if it doesn't exist yet
         if aname_low not in self._tables:
             self._tables[aname_low] = Table(
                 aname_low, path, config=get_ci(self.config["layer"], layer_name)
             )
             table = self._tables[aname_low]
             with open(aligned_entities[aname_low]["fn"], "r") as aligned_file:
+                table.col_names = aligned_file.readline().rstrip().split("\t")[1:]
                 entity_col_names = [f"{aname_low}_id"]
-                entity_col_names += aligned_file.readline().rstrip().split("\t")[1:]
-                table.colNames = [*entity_col_names]
+                for cn in table.col_names:
+                    attribute_props = layer_attributes.get(cn, None)
+                    assert attribute_props is not None, ReferenceError(
+                        f"Attribute {cn} not found for entity {attribute.name}"
+                    )
+                    if attribute_props.get("type", "") == "text":
+                        entity_col_names.append(cn + "_id")
+                        lookup_table = LookupTable(aname_low, cn, path, self.config)
+                        self._tables[f"{aname_low}_{cn}"] = lookup_table
+                    else:
+                        entity_col_names.append(cn)
                 # TODO: form will need a lookup table here too
                 # if 'form' not in entity_col_names:
                 #     entity_col_names.append('form')
@@ -220,20 +232,16 @@ class Parser(abc.ABC):
         table = self._tables[aname_low]
         fk = attribute.value.strip()
         ce = table.current_entity
+        # Still processing the same entity: delay until we hit something else
         if fk == ce.get("id", ""):
-            # TODO: form will need a lookup table here too
-            # if 'form' in ce and 'form' not in self._tables[aname_low]['col_names']:
-            #     ce['form'] += token.attributes['form'].value + (' ' if token.spaceAfter else '')
             table.previous_entity = entity
-            pass
         else:
+            # No longer processing the previous entity
             if ce:
-                entity_cols = [table.cursor]
-                table.cursor += 1
-                entity_cols += ce["cols"]
+                entity_cols = ce["cols"]
                 # Process labels
                 lbls = table.labels
-                for n, col_name in enumerate(table.colNames):
+                for n, col_name in enumerate(table.col_names):
                     ctype = layer_attributes.get(col_name, {}).get("type", "")
                     if ctype != "labels":
                         continue
@@ -245,18 +253,21 @@ class Parser(abc.ABC):
                         bs = "1" + "".join(["0" for _ in range(idx - 1)])
                         bits = bits | int(bs, 2)
                     entity_cols[n] = bin(bits)[2:]
-                # TODO: form will need a lookup table here too
-                # if 'form' in ce and 'form' not in self._tables[aname_low]['col_names']:
-                #     if ce['form'].endswith(' '):
-                #         ce['form'] = ce['form'][:-1]
-                #     entity_cols.append( ce['form'] )
                 range_up = self.char_range_cur - 1  # Stop just before this entity
-                entity_cols.append(f"[{str(ce['range_low'])},{str(range_up)})")
-                table.write(entity_cols)
+                table.write(
+                    [
+                        table.cursor,
+                        *entity_cols,
+                        f"[{str(ce['range_low'])},{str(range_up)})",
+                    ]
+                )
+                table.cursor += 1
+            # Create an empty entity dict if no ID was provided
             if not fk or fk.strip() == "_":
                 ce = {}
             else:
                 ce = {"id": fk}
+                # Read the content of the entity from the provided file
                 with open(aligned_entities[aname_low]["fn"], "r") as aligned_file:
                     while True:
                         line = aligned_file.readline()
@@ -264,10 +275,17 @@ class Parser(abc.ABC):
                             break
                         line = line.rstrip().split("\t")
                         if line[0].strip() == fk:
-                            ce["cols"] = line[1:]
-                            # TODO: form will need a lookup table here too
-                            # if 'form' not in self._tables[aname_low]['col_names']:
-                            #     ce['form'] = token.attributes['form'].value + (' ' if token.spaceAfter else '')
+                            ce["cols"] = []
+                            for n, col in enumerate(line[1:]):
+                                col_name = table.col_names[n]
+                                ctype = layer_attributes.get(col_name, {}).get("type")
+                                if ctype == "text":
+                                    lookup_table = self._tables[
+                                        f"{aname_low}_{col_name}"
+                                    ]
+                                    ce["cols"].append(lookup_table.get_id(col.rstrip()))
+                                else:
+                                    ce["cols"].append(col.rstrip())
                             ce["range_low"] = str(self.char_range_cur)
                             break
             table.current_entity = ce
@@ -282,11 +300,12 @@ class Parser(abc.ABC):
     def close_upload_files(self, path="./"):
         if self._tables is None:
             return
-        # Write label files
+        # Close the files
         for n, tab in self._tables.items():
             tab.file.close()
             if not tab.labels:
                 continue
+            # Write the labels
             nlabels = len(tab.labels)
             with open(os.path.join(path, f"{n}_labels.csv"), "w") as f:
                 f.write("\t".join(["bit", "label"]) + "\n")
@@ -342,22 +361,24 @@ class Parser(abc.ABC):
         """
         Take a reader object and outputs verticalized LCP self._tables
         """
-        docName = "document"
-        segName = "segment"
-        tokName = "token"
+        doc_name = "document"
+        seg_name = "segment"
+        tok_name = "token"
         if "firstClass" in config:
-            docName = config["firstClass"].get("document", docName).lower()
-            segName = config["firstClass"].get("segment", segName).lower()
-            tokName = config["firstClass"].get("token", tokName).lower()
+            doc_name = config["firstClass"].get("document", doc_name).lower()
+            seg_name = config["firstClass"].get("segment", seg_name).lower()
+            tok_name = config["firstClass"].get("token", tok_name).lower()
 
         self._tables = self._tables or {
             "document": Table(
-                docName, path, config=get_ci(self.config["layer"], docName)
+                doc_name, path, config=get_ci(self.config["layer"], doc_name)
             ),
             "segment": Table(
-                segName, path, config=get_ci(self.config["layer"], docName)
+                seg_name, path, config=get_ci(self.config["layer"], doc_name)
             ),
-            "token": Table(tokName, path, config=get_ci(self.config["layer"], docName)),
+            "token": Table(
+                tok_name, path, config=get_ci(self.config["layer"], doc_name)
+            ),
         }
         token_table = self._tables["token"]
         char_range_start = self.char_range_cur
@@ -374,7 +395,9 @@ class Parser(abc.ABC):
                 if current_document is not doc:
                     if current_document:
                         self.upload_new_doc(
-                            current_document, self._tables["document"], docName=docName
+                            current_document,
+                            self._tables["document"],
+                            doc_name=doc_name,
                         )
                     current_document = doc
                     current_document.char_range_start = char_range_segment_start
@@ -382,9 +405,10 @@ class Parser(abc.ABC):
             if not segment:
                 continue
 
+            # List only the token attributes that are not null on every row
             non_null_attributes = token_table.non_null_attributes
             if not non_null_attributes and token_table.cursor == 1:
-                col_names = {f"{tokName}_id": None}
+                col_names = {f"{tok_name}_id": None}
                 for token in segment.tokens:
                     if token.frame_range:
                         has_frame_range = True
@@ -392,11 +416,13 @@ class Parser(abc.ABC):
                         if not attr_value.value:
                             continue
                         non_null_attributes[attr_name] = True
+                        # Dependencies and references to aligned entities will be processed separately; do not list
                         if (
                             isinstance(attr_value, Dependency)
                             or attr_name.lower() in aligned_entities
                         ):
                             continue
+                        # Attributes of type Text and Meta use foreign keys
                         if any(isinstance(attr_value, klass) for klass in (Text, Meta)):
                             col_names[attr_name + "_id"] = None
                         else:
@@ -405,7 +431,7 @@ class Parser(abc.ABC):
                 col_names["char_range"] = None
                 if has_frame_range:
                     col_names["frame_range"] = None
-                col_names[f"{segName}_id"] = None
+                col_names[f"{seg_name}_id"] = None
                 token_table.write([c for c in col_names])
 
             print(
@@ -424,74 +450,15 @@ class Parser(abc.ABC):
                         cols.append("")
                         continue
 
+                    # For example, named_entity
                     if aname_low in aligned_entities and isinstance(attribute, Text):
                         self.aligned_entity(token, path, attribute, aligned_entities)
-                        # if aname_low not in self._tables:
-                        #     self._tables[aname_low] = {
-                        #         'file': open(os.path.join(path,f"{aname_low}.csv"), "a"),
-                        #         'cursor': 1,
-                        #         'current_entity': {},
-                        #         'previousToken': None
-                        #     }
-                        #     with open(aligned_entities[aname_low]['fn'], "r") as aligned_file:
-                        #         ne_col_names = [f"{aname_low}_id"]
-                        #         ne_col_names += aligned_file.readline().split()[1:]
-                        #         self._tables[aname_low]['col_names'] = [*ne_col_names]
-                        #         # TODO: form will need a lookup table here too
-                        #         # if 'form' not in ne_col_names:
-                        #         #     ne_col_names.append('form')
-                        #         ne_col_names.append("char_range")
-                        #         self._tables[aname_low]['file'].write(
-                        #             "\t".join(ne_col_names) + "\n"
-                        #         )
-                        # fk = attribute.value.strip()
-                        # ce = self._tables[aname_low].get("current_entity", {})
-                        # if fk == ce.get("id", ""):
-                        #     # TODO: form will need a lookup table here too
-                        #     # if 'form' in ce and 'form' not in self._tables[aname_low]['col_names']:
-                        #     #     ce['form'] += token.attributes['form'].value + (' ' if token.spaceAfter else '')
-                        #     self._tables[aname_low]['previousToken'] = token
-                        #     pass
-                        # else:
-                        #     # This below will need to be executed after the last iteration too, so make it a method
-                        #     if ce:
-                        #         ne_cols = [str(self._tables[aname_low]['cursor'])]
-                        #         self._tables[aname_low]['cursor'] += 1
-                        #         ne_cols += ce['cols']
-                        #         # TODO: form will need a lookup table here too
-                        #         # if 'form' in ce and 'form' not in self._tables[aname_low]['col_names']:
-                        #         #     if ce['form'].endswith(' '):
-                        #         #         ce['form'] = ce['form'][:-1]
-                        #         #     ne_cols.append( ce['form'] )
-                        #         range_up = self.char_range_cur - 1 # Stop just before this token
-                        #         ne_cols.append( f"[{str(ce['range_low'])},{str(range_up)})" )
-                        #         self._tables[aname_low]['file'].write(
-                        #             "\t".join(ne_cols) + "\n"
-                        #         )
-                        #     if not fk or fk.strip() == "_":
-                        #         ce = {}
-                        #     else:
-                        #         ce = {'id': fk}
-                        #         with open(aligned_entities[aname_low]['fn'], "r") as aligned_file:
-                        #             while True:
-                        #                 line = aligned_file.readline().split()
-                        #                 if not line:
-                        #                     break
-                        #                 if line[0].strip() == fk:
-                        #                     ce['cols'] = line[1:]
-                        #                     # TODO: form will need a lookup table here too
-                        #                     # if 'form' not in self._tables[aname_low]['col_names']:
-                        #                     #     ce['form'] = token.attributes['form'].value + (' ' if token.spaceAfter else '')
-                        #                     ce['range_low'] = str(self.char_range_cur)
-                        #                     break
-                        #     self._tables[aname_low]['current_entity'] = ce
 
+                    # For example, xpos
                     elif isinstance(attribute, Categorical):
                         cols.append(str(attribute.value))
 
-                    # if isinstance(attribute, Meta):
-                    #     cols.append( json.dumps(attribute.value) )
-
+                    # For example, form
                     # We create dicts for text attributes to keep track of their IDs
                     # One idea to optimize memory:
                     # - only using a dict (form -> id) and no verticalized file at all to start with
@@ -499,21 +466,17 @@ class Parser(abc.ABC):
                     #   then start writing entries to self._tables whose name start with the text's first letter
                     # - if a text is not found in the dict, look up the file, and if not found in the file, write to it
                     elif any(isinstance(attribute, klass) for klass in (Text, Meta)):
-                        name = f"{tokName}_{attribute.name}"
+                        name = f"{tok_name}_{attribute.name}"
                         if name not in self._tables:
-                            self._tables[name] = Table(name, path)
+                            self._tables[name] = LookupTable(
+                                tok_name, attribute.name, path, config
+                            )
                         table = self._tables[name]
                         text = str(attribute.value)
-                        id = table.texts.get(text, 0)
-                        if id < 1:
-                            id = table.cursor
-                            table.texts[text] = id
-                            if table.cursor == 1:
-                                table.write([f"{attribute.name}_id", attribute.name])
-                            table.cursor += 1
-                            table.write([str(id), text])
+                        id = table.get_id(text)
                         cols.append(str(id))
 
+                    # For example, head
                     elif isinstance(attribute, Dependency):
                         # token_have_dependencies = True
                         name = attribute.name
@@ -586,7 +549,7 @@ class Parser(abc.ABC):
 
             segment_table = self._tables["segment"]
             if segment_table.cursor == 1:
-                col_names = [f"{segName}_id", "char_range"]
+                col_names = [f"{seg_name}_id", "char_range"]
                 if has_frame_range:
                     col_names.append("frame_range")
                 # Add the names of all segment attributes
@@ -648,7 +611,7 @@ class Parser(abc.ABC):
                         vector.append(f"'{i}{str(a.value)}':{n}")
                 cols[1:] = [" ".join(vector)]
                 if fts_table.cursor == 1:
-                    fts_table.write([f"{segName}_id", "vector"])
+                    fts_table.write([f"{seg_name}_id", "vector"])
                 fts_table.write(cols)
                 fts_table.cursor += 1
 
@@ -673,7 +636,9 @@ class Parser(abc.ABC):
             current_document.char_range_start = char_range_start
 
         # Write the last document
-        self.upload_new_doc(current_document, self._tables["document"], docName=docName)
+        self.upload_new_doc(
+            current_document, self._tables["document"], doc_name=doc_name
+        )
 
         # for _, v in self._tables.items():
         #     v['file'].close()

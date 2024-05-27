@@ -430,6 +430,21 @@ class Table:
         )
 
 
+class LookupTable(Table):
+    def __init__(self, parent_name, own_name, path, config={}):
+        super().__init__(parent_name + "_" + own_name, path, config)
+        self.write([own_name + "_id", own_name])
+
+    def get_id(self, value):
+        id = self.texts.get(value, 0)
+        if id < 1:
+            id = self.cursor
+            self.cursor += 1
+            self.texts[value] = id
+            self.write([str(id), value])
+        return str(id)
+
+
 class Attribute:
     def __init__(self, name, value):
         self.name = name

@@ -236,10 +236,11 @@ class Corpert:
                 ignore_files.add(source)
                 if os.path.exists(source):
                     shutil.copy(source, os.path.join(self.output or "./", filename))
-            # Parse the input files that are not at the token, segment or document level
+            # Process the input files that are not at the token, segment or document level
             for layer, properties in json_obj.get("layer", {}).items():
                 if layer in firstClass.values():
                     continue
+                # Process entities that are spans containing sub-entities (eg. named entities or topics)
                 if (
                     properties.get("abstract", False) == False
                     and properties.get("layerType", "") == "span"
@@ -279,7 +280,7 @@ class Corpert:
                             "properties": properties,
                         }
             parser = None
-            # Parse the remaining input files
+            # Process the remaining input files
             for filepath in self._input_files:
                 if filepath in ignore_files:
                     continue
