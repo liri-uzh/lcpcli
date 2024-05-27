@@ -5,6 +5,12 @@ import uuid
 
 from datetime import date
 
+def is_time_anchored(entity: dict, config: dict) -> bool:
+    if entity.get("anchoring",{}).get("time",False):
+        return True
+    if entity.get("contains", "") in config.get("layer",{}):
+        return is_time_anchored(config['layer'][entity['contains']], config)
+    return False
 
 def get_ci(d: dict, p: str, default={}):
     """

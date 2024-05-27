@@ -16,6 +16,7 @@ import os
 import re
 
 from ..utils import (
+    is_time_anchored,
     get_ci,
     Table,
     LookupTable,
@@ -108,7 +109,7 @@ class Parser(abc.ABC):
         """
         Take a document instance, a character_range cursor and a file handle, and write a line to the file
         """
-        meta = doc.attributes.get("meta")
+        meta = doc.attributes.get("meta", {})
         col_names = [f"{doc_name}_id", "char_range"]
         cols = [
             str(table.cursor),
@@ -119,15 +120,15 @@ class Parser(abc.ABC):
             cols.append(f"[{str(doc.frame_range[0])},{str(doc.frame_range[1])})")
             doc_frame_id = str(meta._value.get("name", doc.id) if meta else doc.id)
             self.doc_frames[doc_frame_id] = [*doc.frame_range]
+        name_doc = str(table.cursor)
         if meta:
             if "name" in meta._value:
-                # dll_gen would require a lookup table to have a column of type text
-                # cols.append( str(meta._value.pop('name')) )
-                # col_names.append("name")
-                pass
+                name_doc = meta._value.pop("name")
             if meta._value:
                 col_names.append("meta")
-                cols.append(str(meta.value))
+                cols.append(str(meta.value).strip())
+        col_names.append("name")
+        cols.append(name_doc)
         media_slots = self.config.get("meta", {}).get("mediaSlots", {})
         if media_slots:
             col_names.append("media")
@@ -204,6 +205,10 @@ class Parser(abc.ABC):
             if layer_name
             else {}
         )
+        contained_entity = aligned_entities[aname_low]["properties"].get("contains", "")
+        has_frame_range = is_time_anchored(
+            self.config["layer"].get(contained_entity, {}), self.config
+        )
         # Create a table for the entity if it doesn't exist yet
         if aname_low not in self._tables:
             self._tables[aname_low] = Table(
@@ -224,10 +229,9 @@ class Parser(abc.ABC):
                         self._tables[f"{aname_low}_{cn}"] = lookup_table
                     else:
                         entity_col_names.append(cn)
-                # TODO: form will need a lookup table here too
-                # if 'form' not in entity_col_names:
-                #     entity_col_names.append('form')
                 entity_col_names.append("char_range")
+                if has_frame_range:
+                    entity_col_names.append("frame_range")
                 table.write(entity_col_names)
         table = self._tables[aname_low]
         fk = attribute.value.strip()
@@ -254,13 +258,22 @@ class Parser(abc.ABC):
                         bits = bits | int(bs, 2)
                     entity_cols[n] = bin(bits)[2:]
                 range_up = self.char_range_cur - 1  # Stop just before this entity
-                table.write(
-                    [
-                        table.cursor,
-                        *entity_cols,
-                        f"[{str(ce['range_low'])},{str(range_up)})",
-                    ]
-                )
+                cols_to_write = [
+                    table.cursor,
+                    *entity_cols,
+                    f"[{str(ce['range_low'])},{str(range_up)})",
+                ]
+                if has_frame_range:
+                    lower_frame_range, upper_frame_range = (
+                        int(ce["frame_range_start"]),
+                        self.frame_range_cur,
+                    )
+                    if upper_frame_range <= lower_frame_range:
+                        upper_frame_range = lower_frame_range + 1
+                    cols_to_write.append(
+                        f"[{str(lower_frame_range)},{str(upper_frame_range)})"
+                    )
+                table.write(cols_to_write)
                 table.cursor += 1
             # Create an empty entity dict if no ID was provided
             if not fk or fk.strip() == "_":
@@ -288,6 +301,8 @@ class Parser(abc.ABC):
                                     ce["cols"].append(col.rstrip())
                             ce["range_low"] = str(self.char_range_cur)
                             break
+                if has_frame_range:
+                    ce["frame_range_start"] = str(self.frame_range_cur)
             table.current_entity = ce
 
     def close_aligned_entity(self, name, path, aligned_entities={}):

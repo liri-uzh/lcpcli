@@ -101,7 +101,7 @@ class CONLLUParser(Parser):
             elif match := re.match(r"# sent_id = (.+)", line):
                 current_sentence["id"] = match[1]
             elif match := re.match(r"#\s+([^=]+)\s+= (.+)", line):
-                current_sentence["meta"][match[1]] = match[2]
+                current_sentence["meta"][match[1]] = match[2].strip()
             elif re.match(r"\d+[\t\s]", line):
                 line = line.split("\t")
                 line = {k: v for k, v in zip(self._features, line)}
