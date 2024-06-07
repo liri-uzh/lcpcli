@@ -18,6 +18,7 @@ import re
 from ..utils import (
     is_time_anchored,
     get_ci,
+    Info,
     Table,
     LookupTable,
     EntityType,
@@ -123,7 +124,8 @@ class Parser(abc.ABC):
         name_doc = str(table.cursor)
         if meta:
             if "name" in meta._value:
-                name_doc = meta._value.pop("name")
+                # name_doc = meta._value.pop("name")
+                name_doc = meta._value.get("name")
             if meta._value:
                 col_names.append("meta")
                 cols.append(str(meta.value).strip())
@@ -151,10 +153,11 @@ class Parser(abc.ABC):
         """
         # head_id is None: this is a new head, process the previous one
         empty_segments = []
-        nested_set_of_previous_head = None
         for segment_id, tokens in table.deps.items():
             if segment_id == working_on:
                 continue
+            nested_set_of_previous_head = None
+            tokens = {k: v for k, v in tokens.items() if not isinstance(k, Info)}
             for token_id, attrs in tokens.items():
                 # Link the nested sets from the dependencies in memory
                 hid = attrs["head_id"]
@@ -164,9 +167,19 @@ class Parser(abc.ABC):
                     continue
                 tokens[hid]["nested_set"].add(tokens[token_id]["nested_set"])
             anchor_right = table.anchor_right
+            try:
+                assert nested_set_of_previous_head, AssertionError(
+                    f"Moved to a new segment without finding the head of the dependencies in the previous segment"
+                )
+            except:
+                continue
+            if nested_set_of_previous_head.consumed:
+                continue
             nested_set_of_previous_head.compute_anchors()
             for id in nested_set_of_previous_head.all_ids:
                 nested_set = tokens[id]["nested_set"]
+                if nested_set.consumed:
+                    continue
                 parent_id = (
                     ""
                     if nested_set.parent is None
@@ -181,7 +194,9 @@ class Parser(abc.ABC):
                         str(anchor_right + nested_set.right),  # right_anchor
                     ]
                 )
+                nested_set.consumed = True
             table.anchor_right = anchor_right + nested_set_of_previous_head.right
+            nested_set_of_previous_head.consumed = True
             # Now clear the processed tokens
             for id in nested_set_of_previous_head.all_ids:
                 tokens.pop(id)
@@ -258,6 +273,8 @@ class Parser(abc.ABC):
                         bits = bits | int(bs, 2)
                     entity_cols[n] = bin(bits)[2:]
                 range_up = self.char_range_cur - 1  # Stop just before this entity
+                if range_up <= int(ce["range_low"]):
+                    range_up = int(ce["range_low"]) + 1
                 cols_to_write = [
                     table.cursor,
                     *entity_cols,
@@ -286,7 +303,7 @@ class Parser(abc.ABC):
                         line = aligned_file.readline()
                         if not line:
                             break
-                        line = line.rstrip().split("\t")
+                        line = line.split("\t")
                         if line[0].strip() == fk:
                             ce["cols"] = []
                             for n, col in enumerate(line[1:]):
@@ -296,9 +313,9 @@ class Parser(abc.ABC):
                                     lookup_table = self._tables[
                                         f"{aname_low}_{col_name}"
                                     ]
-                                    ce["cols"].append(lookup_table.get_id(col.rstrip()))
+                                    ce["cols"].append(lookup_table.get_id(col.strip()))
                                 else:
-                                    ce["cols"].append(col.rstrip())
+                                    ce["cols"].append(col.strip())
                             ce["range_low"] = str(self.char_range_cur)
                             break
                 if has_frame_range:
@@ -415,6 +432,7 @@ class Parser(abc.ABC):
                             doc_name=doc_name,
                         )
                     current_document = doc
+                    current_document.frame_range[0] = offset_frame_range
                     current_document.char_range_start = char_range_segment_start
 
             if not segment:
@@ -508,7 +526,8 @@ class Parser(abc.ABC):
                             )
                         table = self._tables[name]
                         if str(segment.id) not in table.deps:
-                            table.deps[str(segment.id)] = {}
+                            info = Info(segment=segment, document=doc)
+                            table.deps[str(segment.id)] = {info: None}
                         deps = table.deps[str(segment.id)]
                         head_id = attribute.value
                         # We assume a new head necessarily means all of the previous head's dependencies have been parsed
@@ -546,10 +565,6 @@ class Parser(abc.ABC):
                         right_frame_range = left_frame_range + 1
                     cols.append(f"[{str(left_frame_range)},{str(right_frame_range)})")
                     if current_document:
-                        if current_document.frame_range[0] == 0:
-                            current_document.frame_range[0] = (
-                                offset_frame_range + token.frame_range[0]
-                            )
                         current_document.frame_range[1] = (
                             offset_frame_range + token.frame_range[1]
                         )

@@ -5,12 +5,14 @@ import uuid
 
 from datetime import date
 
+
 def is_time_anchored(entity: dict, config: dict) -> bool:
-    if entity.get("anchoring",{}).get("time",False):
+    if entity.get("anchoring", {}).get("time", False):
         return True
-    if entity.get("contains", "") in config.get("layer",{}):
-        return is_time_anchored(config['layer'][entity['contains']], config)
+    if entity.get("contains", "") in config.get("layer", {}):
+        return is_time_anchored(config["layer"][entity["contains"]], config)
     return False
+
 
 def get_ci(d: dict, p: str, default={}):
     """
@@ -401,6 +403,11 @@ class Sentence:
         self._process_lines()
 
 
+class Info:
+    def __init__(self, **params):
+        self.params = params
+
+
 class Table:
     def __init__(self, name, path, config={}):
         self.name = name
@@ -547,6 +554,7 @@ class NestedSet:
         self.parent = None
         self.label = label
         self.cursor_id = cursor
+        self.consumed = False
 
     def compute_anchors(self, left=1):
         self.left = left
