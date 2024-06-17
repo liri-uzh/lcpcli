@@ -422,7 +422,6 @@ class Table:
         self.texts = dict()
         self.deps = dict()
         self.anchor_right = 0
-        self.non_null_attributes = {}
         self.sep = "\t"
         self.quote = f"\b"
         self.trigger_character = "'"
@@ -441,6 +440,13 @@ class Table:
             )
             + "\n"
         )
+
+
+class TokenTable(Table):
+    def __init__(self, name, path, config={}):
+        super().__init__(name, path, config)
+        self.non_null_attributes = {}
+        self.categorical_values = {}
 
 
 class LookupTable(Table):

@@ -20,6 +20,7 @@ from ..utils import (
     get_ci,
     Info,
     Table,
+    TokenTable,
     LookupTable,
     EntityType,
     Document,
@@ -408,7 +409,7 @@ class Parser(abc.ABC):
             "segment": Table(
                 seg_name, path, config=get_ci(self.config["layer"], doc_name)
             ),
-            "token": Table(
+            "token": TokenTable(
                 tok_name, path, config=get_ci(self.config["layer"], doc_name)
             ),
         }
@@ -490,6 +491,11 @@ class Parser(abc.ABC):
                     # For example, xpos
                     elif isinstance(attribute, Categorical):
                         cols.append(str(attribute.value))
+                        if attr_name not in token_table.categorical_values:
+                            token_table.categorical_values[attr_name] = set()
+                        token_table.categorical_values[attr_name].add(
+                            str(attribute.value)
+                        )
 
                     # For example, form
                     # We create dicts for text attributes to keep track of their IDs
@@ -669,6 +675,17 @@ class Parser(abc.ABC):
         self.upload_new_doc(
             current_document, self._tables["document"], doc_name=doc_name
         )
+
+        for l, lp in self.config["layer"].items():
+            if l != self.config["firstClass"]["token"]:
+                continue  # remove once supporting non-token-level categorical attributes too
+            for a, ap in lp.get("attributes", {}).items():
+                if ap.get("type") == "categorical" and not ap.get("isGlobal"):
+                    ap["values"] = ap.get("values", [])
+                    for v in self._tables["token"].categorical_values[a]:
+                        if v in ap["values"]:
+                            continue
+                        ap["values"].append(v)
 
         # for _, v in self._tables.items():
         #     v['file'].close()

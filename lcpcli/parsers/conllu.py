@@ -160,6 +160,8 @@ class CONLLUParser(Parser):
                                 continue
                             pk, pv = pkpv.split("=")
                             pk = pk.strip()
+                            if pk == "SpaceAfter":
+                                continue
                             pv = pv.strip()
                             if pk in ("start", "end"):
                                 token.frame_range = token.frame_range or [0, 0]
