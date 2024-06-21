@@ -234,8 +234,10 @@ class Corpert:
                 filename = f"global_attribute_{glob_attr}.csv"
                 source = os.path.join(self._path, filename)
                 ignore_files.add(source)
-                if os.path.exists(source):
-                    shutil.copy(source, os.path.join(self.output or "./", filename))
+                assert os.path.exists(source), FileExistsError(
+                    f"No file named '{filename}' found for global attribute '{glob_attr}'"
+                )
+                shutil.copy(source, os.path.join(self.output or "./", filename))
             # Process the input files that are not at the token, segment or document level
             for layer, properties in json_obj.get("layer", {}).items():
                 if layer in firstClass.values():
@@ -322,58 +324,72 @@ class Corpert:
                 assert os.path.exists(os.path.join(self._path, fn)), FileExistsError(
                     f"Could not find a file named '{fn}' in {self._path} for time-anchored layer '{layer}'"
                 )
+                attributes = properties.get("attributes", {})
                 output_path = self.output or "./"
                 input_col_names = []
                 doc_id_idx = 0
                 start_idx = 0
                 end_idx = 0
-                with open(os.path.join(self._path, fn), "r") as input_file:
-                    with open(os.path.join(output_path, fn), "w") as output_file:
-                        while True:
-                            input_line = input_file.readline()
-                            if not input_line:
-                                break
-                            input_cols = input_line.split("\t")
-                            output_cols = []
-                            if not input_col_names:
-                                input_col_names = input_cols
-                                output_cols = [
-                                    c.strip()
-                                    for c in input_col_names
-                                    if c not in ("doc_id", "start", "end")
-                                ]
-                                assert "doc_id" in input_col_names, IndexError(
-                                    f"No column named 'doc_id' found in {fn}"
+                with open(os.path.join(self._path, fn), "r") as input_file, open(
+                    os.path.join(output_path, fn), "w"
+                ) as output_file:
+                    while input_line := input_file.readline():
+                        input_cols = input_line.rstrip("\n").split("\t")
+                        output_cols = []
+                        if not input_col_names:
+                            input_col_names = input_cols
+                            output_cols = [
+                                c.strip()
+                                for c in input_col_names
+                                if c not in ("doc_id", "start", "end")
+                            ]
+                            assert "doc_id" in input_col_names, IndexError(
+                                f"No column named 'doc_id' found in {fn}"
+                            )
+                            assert "start" in input_col_names, IndexError(
+                                f"No column named 'start' found in {fn}"
+                            )
+                            assert "end" in input_col_names, IndexError(
+                                f"No column named 'end' found in {fn}"
+                            )
+                            doc_id_idx = input_cols.index("doc_id")
+                            start_idx = input_cols.index("start")
+                            end_idx = input_cols.index("end")
+                            output_cols.append("frame_range")
+                        else:
+                            output_cols = [
+                                c.strip()
+                                for n, c in enumerate(input_cols)
+                                if n not in (doc_id_idx, start_idx, end_idx)
+                            ]
+                            for a, av in attributes.items():
+                                if av.get("type") != "categorical" or av.get(
+                                    "isGlobal"
+                                ):
+                                    continue
+                                col_n = next(
+                                    (
+                                        n
+                                        for n, cn in enumerate(input_col_names)
+                                        if cn == a.lower()
+                                    ),
+                                    None,
                                 )
-                                assert "start" in input_col_names, IndexError(
-                                    f"No column named 'start' found in {fn}"
-                                )
-                                assert "end" in input_col_names, IndexError(
-                                    f"No column named 'end' found in {fn}"
-                                )
-                                doc_id_idx = input_cols.index("doc_id")
-                                start_idx = input_cols.index("start")
-                                end_idx = input_cols.index("end")
-                                output_cols.append("frame_range")
-                            else:
-                                output_cols = [
-                                    c.strip()
-                                    for n, c in enumerate(input_cols)
-                                    if n not in (doc_id_idx, start_idx, end_idx)
-                                ]
-                                doc_frames = parser.doc_frames[
-                                    str(input_cols[doc_id_idx])
-                                ]
-                                times = [
-                                    float(input_cols[x]) for x in (start_idx, end_idx)
-                                ]
-                                start, end = [
-                                    int(times[n] * 25.0) + doc_frames[0] for n in (0, 1)
-                                ]
-                                if end <= start:
-                                    end = int(start) + 1
-                                output_cols.append(f"[{start},{end})")
-                            output_file.write("\t".join(output_cols) + "\n")
+                                if col_n is None:
+                                    continue
+                                av["values"] = av.get("values", [])
+                                value_to_add = input_cols[col_n].strip()
+                                if value_to_add not in av["values"]:
+                                    av["values"].append(value_to_add)
+                            doc_frames = parser.doc_frames[str(input_cols[doc_id_idx])]
+                            times = [float(input_cols[x]) for x in (start_idx, end_idx)]
+                            start, end = [
+                                int(times[n] * 25.0) + doc_frames[0] for n in (0, 1)
+                            ]
+                            if end <= start:
+                                end = int(start) + 1
+                            output_cols.append(f"[{start},{end})")
+                        output_file.write("\t".join(output_cols) + "\n")
 
             print(f"outfiles written to '{self._path}'.")
             json_str = json.dumps(json_obj, indent=4)

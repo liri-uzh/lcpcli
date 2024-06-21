@@ -81,6 +81,10 @@ class CONLLUParser(Parser):
         Take a list of ConLLU lines (comments + tokens) and output (sentence, new_doc | None)
         """
         new_doc = None
+        config = self.config or {}
+        token_from_config = config.get("layer", {}).get(
+            config.get("firstClass", {}).get("token"), {}
+        )
         current_sentence: dict = {"meta": {}, "text": []}
         mediaSlots = self.config.get("meta", {}).get("mediaSlots", {})
         for line in sentence_lines:
@@ -168,10 +172,14 @@ class CONLLUParser(Parser):
                                 token.frame_range[0 if pk == "start" else 1] = int(
                                     25.0 * float(pv)
                                 )
-                                has_frame_range = True
                             else:
                                 misc[pk] = str(pv)
                         token.attributes["misc"] = Meta("misc", misc)
+                    elif (
+                        token_from_config.get("attributes", {}).get(k, {}).get("type")
+                        == "categorical"
+                    ):
+                        token.attributes[k] = Categorical(k, v.rstrip())
                     else:
                         token.attributes[k] = Text(k, v)
 
@@ -192,14 +200,19 @@ class CONLLUParser(Parser):
                     if props.get("layerType", "") == "span"
                     and props.get("contains", "") == seg_layer
                 ]
-                for attr_name in seg_config:
+                for attr_name, attr_props in seg_config.items():
+                    if attr_name == "meta":
+                        continue
                     name = attr_name
                     if name + "_id" in meta:
                         name = name + "_id"
                     elif name not in meta:
                         continue
                     a = meta.pop(name)
-                    sentence.attributes[name] = Attribute(name, a)
+                    attr = Attribute(name, a)
+                    if attr_props.get("type") == "categorical":
+                        attr = Categorical(name, a)
+                    sentence.attributes[name] = attr
                 for seg_container in segment_containers:
                     attr_name = next(
                         (k for k in meta.keys() if k.lower() == seg_container), None
@@ -222,6 +235,19 @@ class CONLLUParser(Parser):
             ret_doc.attributes["meta"] = Meta("meta", new_doc["meta"])
             if new_doc.get("media"):
                 ret_doc.attributes["media"] = Meta("media", new_doc["media"])
+
+            doc_layer = config.get("firstClass", {}).get("document", "")
+            doc_config = (
+                config.get("layer", {}).get(doc_layer, {}).get("attributes", {})
+            )
+            for attr_name in doc_config:
+                name = attr_name
+                if name + "_id" in new_doc["meta"]:
+                    name = name + "_id"
+                elif name not in new_doc["meta"]:
+                    continue
+                a = new_doc["meta"].pop(name)
+                ret_doc.attributes[name] = Attribute(name, a)
             # doc.first_sentence = sentence
 
         return (sentence, ret_doc)

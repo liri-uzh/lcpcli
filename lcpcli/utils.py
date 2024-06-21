@@ -425,6 +425,7 @@ class Table:
         self.sep = "\t"
         self.quote = f"\b"
         self.trigger_character = "'"
+        self.categorical_values: dict[str, set] = {}
 
     def write(self, row: list):
         self.file.write(
@@ -446,7 +447,6 @@ class TokenTable(Table):
     def __init__(self, name, path, config={}):
         super().__init__(name, path, config)
         self.non_null_attributes = {}
-        self.categorical_values = {}
 
 
 class LookupTable(Table):

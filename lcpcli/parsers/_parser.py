@@ -130,8 +130,11 @@ class Parser(abc.ABC):
             if meta._value:
                 col_names.append("meta")
                 cols.append(str(meta.value).strip())
-        col_names.append("name")
-        cols.append(name_doc)
+        for attr_name, attr in doc.attributes.items():
+            if attr_name == "meta":
+                continue
+            col_names.append(attr_name.lower())
+            cols.append(str(attr._value).strip())
         media_slots = self.config.get("meta", {}).get("mediaSlots", {})
         if media_slots:
             col_names.append("media")
@@ -143,6 +146,11 @@ class Parser(abc.ABC):
                     f"Filename missing for required media '{name}' from document {doc.id}"
                 )
             cols.append(media)
+            if any(
+                x.get("mediaType") in ("audio", "video") for x in media_slots.values()
+            ):
+                col_names.append("name")
+                cols.append(name_doc)
         if table.cursor == 1:
             table.write(col_names)
         table.write(cols)
@@ -309,7 +317,16 @@ class Parser(abc.ABC):
                             ce["cols"] = []
                             for n, col in enumerate(line[1:]):
                                 col_name = table.col_names[n]
-                                ctype = layer_attributes.get(col_name, {}).get("type")
+                                attr_name = next(
+                                    (
+                                        x
+                                        for x in layer_attributes
+                                        if x.lower() == col_name
+                                        or x.lower() + "_id" == col_name
+                                    ),
+                                    col_name,
+                                )
+                                ctype = layer_attributes.get(attr_name, {}).get("type")
                                 if ctype == "text":
                                     lookup_table = self._tables[
                                         f"{aname_low}_{col_name}"
@@ -317,6 +334,10 @@ class Parser(abc.ABC):
                                     ce["cols"].append(lookup_table.get_id(col.strip()))
                                 else:
                                     ce["cols"].append(col.strip())
+                                if ctype == "categorical":
+                                    if attr_name not in table.categorical_values:
+                                        table.categorical_values[attr_name] = set()
+                                    table.categorical_values[attr_name].add(col.strip())
                             ce["range_low"] = str(self.char_range_cur)
                             break
                 if has_frame_range:
@@ -610,6 +631,9 @@ class Parser(abc.ABC):
                     self.aligned_entity(segment, path, a, aligned_entities_segment)
                 else:
                     cols.append(a.value)
+                    if a.name not in segment_table.categorical_values:
+                        segment_table.categorical_values[a.name] = set()
+                    segment_table.categorical_values[a.name].add(str(a.value))
             # If this segment doesn't have an attribute for one the aligned entities, close it
             for aligned_entity in aligned_entities_segment:
                 if aligned_entity in [a.lower() for a in segment.attributes.keys()]:
@@ -677,12 +701,18 @@ class Parser(abc.ABC):
         )
 
         for l, lp in self.config["layer"].items():
-            if l != self.config["firstClass"]["token"]:
-                continue  # remove once supporting non-token-level categorical attributes too
+            table_key = next(
+                (v for k, v in self.config["firstClass"].items() if k == l), l
+            ).lower()
+            if table_key not in self._tables:
+                continue
             for a, ap in lp.get("attributes", {}).items():
+                categorical_values = self._tables[table_key].categorical_values.get(a)
+                if not categorical_values:
+                    continue
                 if ap.get("type") == "categorical" and not ap.get("isGlobal"):
                     ap["values"] = ap.get("values", [])
-                    for v in self._tables["token"].categorical_values[a]:
+                    for v in categorical_values:
                         if v in ap["values"]:
                             continue
                         ap["values"].append(v)
