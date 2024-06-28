@@ -4,6 +4,7 @@ import re
 import uuid
 
 from datetime import date
+from pathlib import Path
 
 
 def is_time_anchored(entity: dict, config: dict) -> bool:
@@ -19,6 +20,14 @@ def get_ci(d: dict, p: str, default={}):
     Case-insensitive get on an object
     """
     return next((v for n, v in d.items() if n.lower() == p.lower()), default)
+
+
+def get_file_from_base(fn: str, files: list[str]) -> str:
+    print("list", files)
+    return next(
+        (f for f in files if Path(f).stem.lower() == fn.lower()),
+        "",
+    )
 
 
 class CustomDict:

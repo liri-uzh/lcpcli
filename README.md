@@ -28,7 +28,24 @@ lcpcli --help
 
 Besides the standard token-level CoNLL-U fields (`form`, `lemma`, `upos`, `xpos`, `feats`, `head`, `deprel`, `deps`) one can also provide document- and sentence-level annotations using comment lines in the files (see [the CoNLL-U Format section](#conll-u-format))
 
-A more advanced functionality, `lcpcli` supports annotations aligned at the character level, such as named entities. See [the Named Entities section](#named-entities) for more information
+A more advanced functionality, `lcpcli` supports annotations aligned at the character level, such as named entities. See [the Named Entities section](#character-aligned-annotations-(e.g.-named-entities)) for more information
+
+### Example corpus
+
+`lcpcli` ships with an example one-video "corpus": the video is an excerpt from the CC-BY 3.0 "Big Buck Bunny" video ((c) copyright 2008, Blender Foundation / www.bigbuckbunny.org) and the "transcription" is a sample of the Declaration of the Human Rights
+
+To populate a folder with the example data, use this command
+
+```bash
+lcpcli --example /destination/folder/
+```
+
+This will create a subfolder named *free_video_corpus* in */destination/folder* which, itself, contains two subfolders: *input* and *output*. The *input* subfolder contains four files: 
+ - *doc.conllu* is a CoNLL-U Plus file that contains the textual data, with time alignments in seconds at the token- (`start` and `end` in the MISC column), segment- (`# start = ` and `# end = ` comments) and document-level (`#newdoc start =` and `#newdoc end =`)
+ - *namedentity.tsv* is a tab-separated value lookup file that contains information about the named entities, where each row associates an ID reported in the `namedentity` token cells of *doc.conllu* with two attributes, `type` and `form`
+ - *shot.tsv* is a tab-separated value file that defines time-aligned annotations about the shots in the video in the `view` column, where the `start` and `end` columns are timestamps, in seconds, relative to the document referenced in the `doc_id` column
+ - *meta.json* is a JSON file that defines the structure of the corpus, used both for pre-processing the data before upload, and when adding the data to the LCP database. Read on for information on the definitions in this file
+
 
 ### CoNLL-U Format
 
@@ -39,51 +56,60 @@ This means that if a CoNLL-U file contains the line `# newdoc author = Jane Doe`
 
 All other comment lines following the format `# key = value` will add an entry to the `meta` attribute of the _segment_ corresponding to the sentence below that line (ie not at the document level)
 
-The key-value pairs in the `misc` column in a column line will go in the `meta` attribute of the corresponding token, with the exceptions of these key-value combinations:
- - `SpaceAfter=Yes` vs. `SpaceAfter=No` controls whether the token will be represented with a trailing space character in the database
- - `start=n.m|end=o.p` will align tokens, segments (sentences) and documents along a temporal axis, where `n.m` and `o.p` should be floating values in seconds
+The key-value pairs in the `MISC` column of a token line will go in the `meta` attribute of the corresponding token, with the exceptions of these key-value combinations:
+ - `SpaceAfter=Yes` vs. `SpaceAfter=No` (case senstive) controls whether the token will be represented with a trailing space character in the database
+ - `start=n.m|end=o.p` (case senstive) will align tokens, segments (sentences) and documents along a temporal axis, where `n.m` and `o.p` should be floating values in seconds
 
 See below how to report all the attributes in the template `.json` file
 
-#### CoNLL-U PLUS
+#### CoNLL-U Plus
 
-CoNLL-U PLUS is an extension to the CoNLLU-U format documented at: https://universaldependencies.org/ext-format.html
+CoNLL-U Plus is an extension to the CoNLLU-U format documented at: https://universaldependencies.org/ext-format.html
 
-If your files start with a comment line of the form `# global.columns = ID FORM LEMMA UPOS XPOS FEATS HEAD DEPREL DEPS MISC`, `lcpcli` will treat them as CoNLL-U PLUS files and process the columns according to the names you set in that line
+If your files start with a comment line of the form `# global.columns = ID FORM LEMMA UPOS XPOS FEATS HEAD DEPREL DEPS MISC`, `lcpcli` will treat them as CoNLL-U Plus files and process the columns according to the names you set in that line
 
-#### Named Entities
 
-Besides the nested token-, segment- and document-level entities, you can use `lcpcli` to define other character-aligned entities, such as named entities. To do so, you will need to prepare your corpus as CoNLL-U PLUS files which must define a dedicated column, e.g. `NAMEDENTITY`:
+#### Annotations of sequences of tokens (e.g. Named Entities)
 
-```conllu
-# global.columns = ID FORM LEMMA UPOS NAMEDENTITY
-```
-
-All the tokens belonging to the same named entity should report the same index in that column, or `_` if it doesn't belong to a named entity. For example (assuming the columns defined above):
+You can use `lcpcli` to define annotations on sequences of tokens below the segment level, for example named entities. To do so, you will need to prepare your corpus as CoNLL-U Plus files which must define a dedicated column, e.g. `namedentity`:
 
 ```conllu
-0	Christoph	Christoph	PROPN	114
-1	W.	W.	PROPN	114
-2	Bauer	Bauer	PROPN	114
-3	erzählt	erzählen	VERB	_
-4	die	der	DET	_
-5	Geschichte	Geschichte	NOUN	_
-6	von	von	ADP	_
-7	Innsbruck	Innsbruck	PROPN	115
-8	,	,	PUNCT	_
+# global.columns = ID FORM LEMMA UPOS XPOS FEATS HEAD DEPREL DEPS MISC namedentity
 ```
 
-In this example, the three first tokens belong to the same named entity ("Christoph W. Bauer") and "Innsbruck" forms another named entity.
+All the tokens belonging to the same named entity should report the same index in that column, or `_` (as per CoNLL-U conventions) if it doesn't belong to a named entity. For example:
 
-The directory containing your corpus files should also include one TSV file named after that column (in this example, it could be named `namedentity.tsv` -- the extension doesn't matter, as long as it's not the same as your CoNLLU files). Its first line should report headers, starting with `ID` and then any attributes associated with a named entity. The value in the first column for all the other lines should correspond to the ones listed in the CoNLLU file(s). For example:
+```conllu
+1	Adopted	adopt	VERB	V	Tense=Past|VerbForm=Part	0	root	_	start=2.20|end=2.30	_
+2	and	and	CCONJ	CC	_	3	cc	_	start=2.30|end=2.35	_
+3	proclaimed	proclaim	VERB	V	Tense=Past|VerbForm=Part	1	conj	_	start=2.38|end=2.45	_
+4	by	by	ADP	E	_	7	case	_	start=2.45|end=2.50	_
+5	General	general	ADJ	A	Degree=Pos	6	amod	_	start=2.55|end=2.75	1
+6	Assembly	assembly	NOUN	S	Number=Sing	7	nmod	_	start=2.85|end=3.15	1
+7	resolution	resolution	NOUN	S	Number=Sing	3	obl	_	start=3.20|end=3.22	_
+8	217	217	NUM	N	NumType=Card	7	nummod	_	SpaceAfter=No|start=3.24|end=3.40	_
+9	A	A	X	X	_	8	dep	_	start=3.42|end=3.44	_
+10	(	(	PUNCT	FB	_	11	punct	_	SpaceAfter=No|start=3.44|end=3.45	_
+11	III	third	ADJ	NO	Degree=Pos|NumType=Ord	8	amod	_	SpaceAfter=No|start=3.47|end=3.53	_
+12	)	)	PUNCT	FB	_	11	punct	_	start=3.53|end=3.54	_
+13	of	of	ADP	E	_	14	case	_	start=3.55|end=3.62	_
+14	10	10	NUM	N	NumType=Card	7	nmod	_	start=3.75|end=4.07	2
+15	December	December	PROPN	SP	_	14	flat	_	start=4.09|end=4.13	2
+16	1948	1948	NUM	N	NumType=Card	14	flat	_	SpaceAfter=No|start=4.15|end=4.23	2
+17	.	.	PUNCT	FS	_	1	punct	_	start=4.24|end=4.25	_
+```
+
+In this example, tokens 5-6 belong to the same named entity ("General Assembly") and "10 December 1948" forms another named entity.
+
+The directory containing your corpus files should also include one TSV file named after that column: the filename should match the column name, all in lower-case, plus an extension (e.g. `.tsv`) -- in the example corpus, the column as reported in the first comment line (`global.columns`) is named `namedentity` and, correspondingly, the TSV file is named _namedentity.tsv_. Its first line should report headers, starting with `namedentity_id` and then any attributes associated with a named entity. The value in the first cell of all the non-header lines should correspond to the ones listed in the CoNLL-U file(s) for lookup purposes. For example:
 
 ```tsv
-ID	type
-114	PER
-115	LOC
+namedentity_id	type	form
+1	ORG	General Assembly
+2	DATE	10 December 1948
 ```
 
-Along with the CoNLLU-PLUS lines above, this would associate the corresponding occurrence of the sequence "Christoph W. Bauer" with a named entity of type `PER` and the corresponding occurrence of "Innsbruck" with a named entity of type `LOC`.
+When parsed along with the CoNLL-U Plus lines above, this would associate the corresponding occurrence of the sequence "General Assembly" with a named entity of type `ORG` and the corresponding occurrence of "10 December 1948" with a named entity of type `DATE`.
 
 Finally, you need to report a corresponding entity type in the template `.json` under the `layer` key, for example:
 
@@ -93,15 +119,14 @@ Finally, you need to report a corresponding entity type in the template `.json` 
     "layerType": "span",
     "contains": "Token",
     "attributes": {
+        "form": {
+            "isGlobal": false,
+            "type": "text",
+            "nullable": false
+        },
         "type": {
             "isGlobal": false,
             "type": "categorical",
-            "values": [
-                "PER",
-                "LOC",
-                "MISC",
-                "ORG"
-            ],
             "nullable": true
         }
     }
@@ -110,14 +135,68 @@ Finally, you need to report a corresponding entity type in the template `.json` 
 
 Make sure to set the `abstract`, `layerType` and `contains` attributes as illustrated above. See the section [Convert and Upload](#convert-and-upload) for a full example of a template `.json` file.
 
-#### Other anchored entities
+One can then query named entities by specifying that they are contained in segments, and that they should contain specific tokens. For example, the following DQD query would match all the named entities the corpus' segments that contain an adjective token:
 
-Your corpus can include other entities besides tokens, sentences, documents and annotations that enter in a subset/superset relation with those. For example, a video corpus could include _gestures_ that are **time-anchored** but do not necessarily align with tokens or segments on the time axis (e.g. a gesture could start in the middle of a sentence and end some time after its end)
+```dqd
+Segment s
 
-In such a case, your template `.json` file should report that entity under `layer`, for example:
+NamedEntity@s ne
+    type = "ORG"
+
+Token@ne t
+    upos = "ADJ"
+
+res => plain
+    context
+        s
+    entities
+        ne
+```
+
+
+#### Annotations of sequences of segments (e.g. Topics)
+
+
+You can use `lcpcli` to define annotations on sequences of segments below the document level, for example topics. The approach is almost identical to the one for annotations of sequences of tokens; the following only describes the differences:
+
+ - one does _not_ define a new column in `global.columns`
+ - one does _not_ report the lookup indices in the token lines
+ - one reports the indices as segment-level comments, named to match the TSV file; for example, a segment-level comment `# topic = 1` will look up the file _topic.tsv_ for a row whose first cell has the value `1`
+
+Just like with token-level annotations, all consecutive segments sharing the same value in the annotation comment will be grouped together as one occurrence of that annotation.
+
+One can then query segments that belong to specific topics. For example the following DQD query would match all the segments that belong to a topic named "bunny" (assuming `topic.csv` has a corresponding column `name`):
+
+```dqd
+Topic top
+    name = "bunny"
+
+Segment@top s
+
+res => plain
+    context
+        s
+    entities
+        s
+```
+
+#### Time-aligned annotations
+
+Your corpus can also include annotations that do not strictly group entities together. The example video corpus includes an annotation named _shot_ that is **time-aligned** but does not necessarily align with tokens or segments on the time axis (e.g. a shot can start in the middle of a sentence and end some time after its end)
+
+Much like with the annotation types described above, you should also include a corresponding TSV file. The first column should list unique IDs; one column should be named `doc_id` and report the ID of the corresponding document (make sure to include corresponding `# newdoc id = <ID>` comments in your CoNLL-U files); two columns named `start` and `end` should list the time points for temporal anchoring, measured in seconds from the start of the document's media file; with extra columns for additional attributes. For example, `shot.tsv` starts with:
+
+```tsv
+shot_id	doc_id	start	end	view
+1	Bunny	0.00	8.00	wide angle
+2	Bunny	8.05	12.50	low angle
+3	Bunny	12.75	16.00	face-cam
+```
+
+Your template `.json` file should report _Shot_ under `layer`, for example:
 
 ```json
-"Gesture": {
+"Shot": {
     "abstract": false,
     "layerType": "unit",
     "anchoring": {
@@ -126,25 +205,32 @@ In such a case, your template `.json` file should report that entity under `laye
         "time": true
     },
     "attributes": {
-        "name": {
-            "type": "categorical",
-            "values": [
-                "waving",
-                "thumbsup"
-            ]
+        "view": {
+            "type": "categorical"
         }
     }
 },
 ```
 
-Much like in the case of named entities described above, you should also include a TSV file that lists the entities, named `<entity>.csv`. The first column should be named `<entity>_id` and list unique IDs; one column should be named `doc_id` and report the ID of the corresponding document (make sure to include corresponding `# newdoc id = <ID>` comments in your CoNLLU files); two columns named `start` and `end` should list the time points for temporal anchoring, measured in seconds from the start of the document's media file; with additional columns for the entity's attributes. For example, `gesture.csv`:
+Assuming the sentences are also time-aligned (as in the example corpus) you can then query segments that overlap with specific shots, for example:
 
-```tsv
-gesture_id	doc_id	start	end	name
-1	video1	1.2	3.5	waving
-2	video1	2.3	4.7	thumbsup
-3	video2	3.2	4.5	thumbsup
-4	video2	8.3	9.7	waving
+```dqd
+Segment s
+
+Shot sh
+    OR # either...
+        AND # ... the shot start in the middle of the segment
+            start >= s.start + 0.0s
+            start <= s.end + 0.0s
+        AND # ... or the short ends in the middle of the segment
+            end >= s.start + 0.0s
+            end <= s.end + 0.0s
+
+res => plain
+    context
+        s
+    entities
+        ne
 ```
 
 #### Global attributes
@@ -191,9 +277,9 @@ In some cases, it makes sense for multiple entity types to share references: in 
 }
 ```
 
-You should include a file named `global_attribute_agent.csv` (mind the singular on `attribute`) with three columns: `agent_id`, `name` and `age`, and reference the values of `agent_id` appropriately as a sentence-level comment in your CoNLL-U files as well as in a file named `gesture.csv`. For example:
+You should include a file named `global_attribute_agent.tsv` (mind the singular on `attribute`) with three columns: `agent_id`, `name` and `age`, and reference the values of `agent_id` appropriately as a sentence-level comment in your CoNLL-U files as well as in a file named `gesture.tsv`. For example:
 
-*global_attribute_agent.csv*:
+*global_attribute_agent.tsv*:
 ```tsv
 agent_id	agent
 10	{"name": "Jane Doe", "age": 37}
@@ -208,7 +294,7 @@ CoNLL-U file:
 The the _ _ _
 ```
 
-*gesture.csv*:
+*gesture.tsv*:
 ```tsv
 gesture_id	agent_id	doc_id	start	end
 1	10	video1	1.25	2.6
@@ -216,21 +302,40 @@ gesture_id	agent_id	doc_id	start	end
 
 #### Media files
 
-If your corpus include media files, your `.json` template should report it under a main `mediaSlots` key, e.g.:
+If your corpus includes media files, your `.json` template should report it under a `mediaSlots` key in `meta`, e.g.:
 
 ```json
-"mediaSlots": {
-    "interview": {
-        "type": "audio",
-        "isOptional": false
+"meta": {
+    "name": "Free Single-Video Corpus",
+    "author": "LiRI",
+    "date": "2024-06-13",
+    "version": 1,
+    "corpusDescription": "Single, open-source video with annotated shots and a placeholder text stream from the Universal Declaration of Human Rights annotated with named entities",
+    "mediaSlots": {
+        "video": {
+            "mediaType": "video",
+            "isOptional": false
+        }
     }
-}
+},
 ```
 
 Your CoNLL-U file(s) should accordingly report each document's media file's name in a comment, like so:
 
 ```tsv
-# newdoc interview = itvw1.mp3
+# newdoc video = bunny.mp4
+```
+
+The `.json` template should also define a main key named `tracks` to control what annotations will be represented along the time axis. For example the following will report shot, segment and named entities in a timeline:
+
+```json
+"tracks": {
+    "layers": {
+        "Shot": {},
+        "Segment": {},
+        "NamedEntity": {}
+    }
+}
 ```
 
 Finally, your **output** corpus folder should include a subfolder named `media` in which all the referenced media files have been placed
@@ -244,17 +349,17 @@ Finally, your **output** corpus folder should include a subfolder named `media` 
 
 ```json
 {
-    "meta":{
-        "name":"My corpus",
-        "author":"Myself",
-        "date":"2023",
+    "meta": {
+        "name": "Free Single-Video Corpus",
+        "author": "LiRI",
+        "date": "2024-06-13",
         "version": 1,
-        "corpusDescription":"This is my corpus"
-    },
-    "mediaSlots": {
-        "interview": {
-            "type": "audio",
-            "isOptional": false
+        "corpusDescription": "Single, open-source video with annotated shots and a placeholder text stream from the Universal Declaration of Human Rights annotated with named entities",
+        "mediaSlots": {
+            "video": {
+                "mediaType": "video",
+                "isOptional": false
+            }
         }
     },
     "firstClass": {
@@ -269,7 +374,7 @@ Finally, your **output** corpus folder should include a subfolder named `media` 
             "anchoring": {
                 "location": false,
                 "stream": true,
-                "time": false
+                "time": true
             },
             "attributes": {
                 "form": {
@@ -287,8 +392,44 @@ Finally, your **output** corpus folder should include a subfolder named `media` 
                     "type": "categorical",
                     "nullable": true
                 },
-                "misc": {
-                    "type": "jsonb"
+                "xpos": {
+                    "isGlobal": false,
+                    "type": "categorical",
+                    "nullable": true
+                },
+                "ufeat": {
+                    "isGlobal": false,
+                    "type": "dict",
+                    "nullable": true
+                }
+            }
+        },
+        "DepRel": {
+            "abstract": true,
+            "layerType": "relation",
+            "attributes": {
+                "udep": {
+                    "type": "categorical",
+                    "isGlobal": true,
+                    "nullable": false
+                },
+                "source": {
+                    "name": "dependent",
+                    "entity": "Token",
+                    "nullable": false
+                },
+                "target": {
+                    "name": "head",
+                    "entity": "Token",
+                    "nullable": true
+                },
+                "left_anchor": {
+                    "type": "number",
+                    "nullable": false
+                },
+                "right_anchor": {
+                    "type": "number",
+                    "nullable": false
                 }
             }
         },
@@ -297,28 +438,31 @@ Finally, your **output** corpus folder should include a subfolder named `media` 
             "layerType": "span",
             "contains": "Token",
             "attributes": {
+                "form": {
+                    "isGlobal": false,
+                    "type": "text",
+                    "nullable": false
+                },
                 "type": {
                     "isGlobal": false,
                     "type": "categorical",
-                    "values": [
-                        "PER",
-                        "LOC",
-                        "MISC",
-                        "ORG"
-                    ],
                     "nullable": true
                 }
             }
         },
-        "Gesture": {
+        "Shot": {
             "abstract": false,
-            "layerType": "unit",
+            "layerType": "span",
             "anchoring": {
+                "location": false,
+                "stream": false,
                 "time": true
             },
             "attributes": {
-                "agent": {
-                    "ref": "agent"
+                "view": {
+                    "isGlobal": false,
+                    "type": "categorical",
+                    "nullable": false
                 }
             }
         },
@@ -327,8 +471,16 @@ Finally, your **output** corpus folder should include a subfolder named `media` 
             "layerType": "span",
             "contains": "Token",
             "attributes": {
-                "agent": {
-                    "ref": "agent"
+                "meta": {
+                    "text": {
+                        "type": "text"
+                    },
+                    "start": {
+                        "type": "text"
+                    },
+                    "end": {
+                        "type": "text"
+                    }
                 }
             }
         },
@@ -338,37 +490,32 @@ Finally, your **output** corpus folder should include a subfolder named `media` 
             "layerType": "span",
             "attributes": {
                 "meta": {
-                    "Autor": {
+                    "audio": {
                         "type": "text",
-                        "nullable": true
+                        "isOptional": true
                     },
-                    "promethia_id": {
+                    "video": {
                         "type": "text",
-                        "nullable": true
+                        "isOptional": true
                     },
-                    "ISBN": {
-                        "type": "text",
-                        "nullable": true
+                    "start": {
+                        "type": "number"
                     },
-                    "Titel": {
-                        "type": "text",
-                        "nullable": true
+                    "end": {
+                        "type": "number"
+                    },
+                    "name": {
+                        "type": "text"
                     }
                 }
             }
         }
     },
-    "globalAttributes": {
-        "agent": {
-            "type": "dict",
-            "keys": {
-                "name": {
-                    "type": "text"
-                },
-                "age": {
-                    "type": "number"
-                }
-            }
+    "tracks": {
+        "layers": {
+            "Shot": {},
+            "Segment": {},
+            "NamedEntity": {}
         }
     }
 }

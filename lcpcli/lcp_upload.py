@@ -14,13 +14,17 @@ import requests
 from tqdm import tqdm
 
 from .cli import _parse_cmd_line
+from .utils import get_file_from_base
 
 CREATE_URL = "https://lcp.test.linguistik.uzh.ch/create"
 UPLOAD_URL = "https://lcp.test.linguistik.uzh.ch/upload"
 CREATE_URL_TEST = "http://localhost:9090/create"
 UPLOAD_URL_TEST = "http://localhost:9090/upload"
 
-VALID_EXTENSIONS = ("csv",)
+VALID_EXTENSIONS = (
+    "csv",
+    "tsv",
+)
 COMPRESSED_EXTENSIONS = ("zip", "tar", "tar.gz", "tar.xz", "7z")
 MEDIA_EXTENSIONS = ("mp3", "mp4", "wav", "ogg")
 
@@ -56,7 +60,7 @@ def lcp_upload(
             [
                 os.path.getsize(os.path.join(corpus, f))
                 for f in os.listdir(corpus)
-                if f.endswith(".csv")
+                if f.endswith((".csv", ".tsv"))
             ]
         )
         if total_size > 1e9:
@@ -148,7 +152,8 @@ def lcp_upload(
             "The media files should be placed inside a 'media' subfolder"
         )
         doc_name = cast(dict, template_data)["firstClass"]["document"]
-        with open(os.path.join(corpus, f"{doc_name.lower()}.csv"), "r") as doc_file:
+        doc_fn = get_file_from_base(doc_name, os.listdir(corpus))
+        with open(os.path.join(corpus, doc_fn), "r") as doc_file:
             media_ncol = -1
             nline = 0
             while True:

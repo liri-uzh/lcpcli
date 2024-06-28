@@ -72,7 +72,7 @@ then `lcpcli -c {output_path} -k $API_KEY -s $API_SECRET -p $PROJECT_NAME --live
             os.makedirs(output_dir, exist_ok=True)
             json = ""
             for f in os.listdir(path):
-                if f.endswith(".csv"):
+                if f.endswith((".csv", ".tsv")):
                     os.rename(os.path.join(path, f), os.path.join(output_dir, f))
                 elif f.endswith(".json") and not json:
                     shutil.copy(os.path.join(path, f), os.path.join(output_dir, f))

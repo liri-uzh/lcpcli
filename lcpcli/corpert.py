@@ -9,7 +9,7 @@ from .parsers.tei import TEIParser
 from .parsers.json import JSONParser
 
 from .cli import _parse_cmd_line
-from .utils import default_json
+from .utils import default_json, get_file_from_base
 
 from jsonschema import validate
 from pathlib import Path
@@ -242,14 +242,16 @@ class Corpert:
                     or layer in firstClass.values()
                 ):
                     continue
-                fn = f"{layer.lower()}.csv"
-                assert os.path.exists(os.path.join(self._path, fn)), FileNotFoundError(
+                fn = get_file_from_base(layer, os.listdir(self._path))
+                fpath = os.path.join(self._path, fn)
+                assert os.path.exists(fpath), FileNotFoundError(
                     f"Could not find a file named '{fn}' in {self._path} for time-anchored layer '{layer}'"
                 )
-                ignore_files.add(fn)
+                ignore_files.add(fpath)
             # Detect the global attributes files and exclude them from the list of files to process
             for glob_attr in json_obj.get("globalAttributes", {}):
-                filename = f"global_attribute_{glob_attr}.csv"
+                stem_name = f"global_attribute_{glob_attr}"
+                filename = get_file_from_base(stem_name, os.listdir(self._path))
                 source = os.path.join(self._path, filename)
                 ignore_files.add(source)
                 assert os.path.exists(source), FileExistsError(
@@ -269,13 +271,8 @@ class Corpert:
                     not in (firstClass["token"], firstClass["segment"])
                 ):
                     continue
-                layerFile = next(
-                    (
-                        f
-                        for f in self._input_files
-                        if Path(f).stem.lower() == layer.lower()
-                    ),
-                    "",
+                layerFile = os.path.join(
+                    self._path, get_file_from_base(layer, os.listdir(self._path))
                 )
                 assert layerFile, FileExistsError(
                     f"Could not find a reference file for entity type '{layer}'"
@@ -336,7 +333,7 @@ class Corpert:
                     or layer in firstClass.values()
                 ):
                     continue
-                fn = f"{layer.lower()}.csv"
+                fn = get_file_from_base(layer, os.listdir(self._path))
                 attributes = properties.get("attributes", {})
                 output_path = self.output or "./"
                 input_col_names = []
