@@ -229,6 +229,24 @@ class Corpert:
             aligned_entities = {}
             aligned_entities_segment = {}
             firstClass = json_obj.get("firstClass", {})
+            token_is_char_anchored = (
+                json_obj.get("layer", {})
+                .get(firstClass["token"], {})
+                .get("anchoring", {})
+                .get("stream", False)
+            )
+            # Check the existence of time-anchored files and add them to ignore_files
+            for layer, properties in json_obj.get("layer", {}).items():
+                if (
+                    not properties.get("anchoring", {}).get("time", False)
+                    or layer in firstClass.values()
+                ):
+                    continue
+                fn = f"{layer.lower()}.csv"
+                assert os.path.exists(os.path.join(self._path, fn)), FileNotFoundError(
+                    f"Could not find a file named '{fn}' in {self._path} for time-anchored layer '{layer}'"
+                )
+                ignore_files.add(fn)
             # Detect the global attributes files and exclude them from the list of files to process
             for glob_attr in json_obj.get("globalAttributes", {}):
                 filename = f"global_attribute_{glob_attr}.csv"
@@ -244,43 +262,41 @@ class Corpert:
                     continue
                 # Process entities that are spans containing sub-entities (eg. named entities or topics)
                 if (
-                    properties.get("abstract", False) == False
-                    and properties.get("layerType", "") == "span"
-                    and properties.get("contains", "")
-                    in (firstClass["token"], firstClass["segment"])
-                    and json_obj.get("layer", {})
-                    .get(firstClass["token"], {})
-                    .get("anchoring", {})
-                    .get("stream", False)
+                    not token_is_char_anchored
+                    or properties.get("abstract")
+                    or properties.get("layerType") != "span"
+                    or properties.get("contains", "")
+                    not in (firstClass["token"], firstClass["segment"])
                 ):
-                    layerFile = next(
-                        (
-                            f
-                            for f in self._input_files
-                            if Path(f).stem.lower() == layer.lower()
-                        ),
-                        "",
-                    )
-                    assert layerFile, FileExistsError(
-                        f"Could not find a reference file for entity type '{layer}'"
-                    )
-                    ignore_files.add(layerFile)
-                    with open(layerFile, "r") as f:
-                        cols = [x.lower() for x in f.readline().split()]
-                        for a in properties.get("attributes", {}):
-                            assert a.lower() in cols, ReferenceError(
-                                f"No column found for attribute '{a}' in {layerFile}"
-                            )
-                    if properties["contains"] == firstClass["token"]:
-                        aligned_entities[layer.lower()] = {
-                            "fn": layerFile,
-                            "properties": properties,
-                        }
-                    else:
-                        aligned_entities_segment[layer.lower()] = {
-                            "fn": layerFile,
-                            "properties": properties,
-                        }
+                    continue
+                layerFile = next(
+                    (
+                        f
+                        for f in self._input_files
+                        if Path(f).stem.lower() == layer.lower()
+                    ),
+                    "",
+                )
+                assert layerFile, FileExistsError(
+                    f"Could not find a reference file for entity type '{layer}'"
+                )
+                ignore_files.add(layerFile)
+                with open(layerFile, "r") as f:
+                    cols = [x.lower() for x in f.readline().split()]
+                    for a in properties.get("attributes", {}):
+                        assert a.lower() in cols, ReferenceError(
+                            f"No column found for attribute '{a}' in {layerFile}"
+                        )
+                if properties["contains"] == firstClass["token"]:
+                    aligned_entities[layer.lower()] = {
+                        "fn": layerFile,
+                        "properties": properties,
+                    }
+                else:
+                    aligned_entities_segment[layer.lower()] = {
+                        "fn": layerFile,
+                        "properties": properties,
+                    }
             parser = None
             # Process the remaining input files
             for filepath in self._input_files:
@@ -317,13 +333,10 @@ class Corpert:
             for layer, properties in json_obj.get("layer", {}).items():
                 if (
                     not properties.get("anchoring", {}).get("time", False)
-                    or layer in json_obj["firstClass"].values()
+                    or layer in firstClass.values()
                 ):
                     continue
                 fn = f"{layer.lower()}.csv"
-                assert os.path.exists(os.path.join(self._path, fn)), FileExistsError(
-                    f"Could not find a file named '{fn}' in {self._path} for time-anchored layer '{layer}'"
-                )
                 attributes = properties.get("attributes", {})
                 output_path = self.output or "./"
                 input_col_names = []

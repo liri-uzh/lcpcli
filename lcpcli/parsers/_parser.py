@@ -134,18 +134,16 @@ class Parser(abc.ABC):
             if attr_name == "meta":
                 continue
             col_names.append(attr_name.lower())
-            cols.append(str(attr._value).strip())
+            cols.append(str(attr.value).strip())
         media_slots = self.config.get("meta", {}).get("mediaSlots", {})
         if media_slots:
-            col_names.append("media")
-            media = doc.attributes.get("media", Meta("dymmy", {})).value
+            media = doc.attributes.get("media", Meta("dummy", {})).value
             for name, attribs in media_slots.items():
                 assert (
                     attribs.get("isOptional") is not False or name in media
                 ), KeyError(
                     f"Filename missing for required media '{name}' from document {doc.id}"
                 )
-            cols.append(media)
             if any(
                 x.get("mediaType") in ("audio", "video") for x in media_slots.values()
             ):

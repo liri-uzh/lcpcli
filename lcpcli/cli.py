@@ -41,11 +41,10 @@ def _parse_cmd_line():
     )
     parser.add_argument(
         "-x",
-        "--combine",
+        "--example",
         required=False,
-        type=bool,
-        default=False,
-        help="Combine into single file?",
+        type=str,
+        help="Populates the destination folder with data of an example one-video corpus",
         # action=argparse.BooleanOptionalAction,
     )
 
@@ -91,14 +90,6 @@ def _parse_cmd_line():
         required=False,
         default=False,
         help="Use live system? If false, use test system.",
-        **BOOL_KWARGS,
-    )
-    parser.add_argument(
-        "-v",
-        "--vian",
-        required=False,
-        default=False,
-        help="Upload to VIAN instead of LCP?",
         **BOOL_KWARGS,
     )
     parser.add_argument(

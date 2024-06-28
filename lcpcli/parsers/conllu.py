@@ -235,7 +235,6 @@ class CONLLUParser(Parser):
             ret_doc.attributes["meta"] = Meta("meta", new_doc["meta"])
             if new_doc.get("media"):
                 ret_doc.attributes["media"] = Meta("media", new_doc["media"])
-
             doc_layer = config.get("firstClass", {}).get("document", "")
             doc_config = (
                 config.get("layer", {}).get(doc_layer, {}).get("attributes", {})

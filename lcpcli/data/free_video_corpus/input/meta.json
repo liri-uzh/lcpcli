@@ -1,0 +1,171 @@
+{
+    "meta": {
+        "name": "Free Single-Video Corpus",
+        "author": "LiRI",
+        "date": "2024-06-13",
+        "version": 1,
+        "corpusDescription": "Single, open-source video with annotated shots and a placeholder text stream from the Universal Declaration of Human Rights annotated with named entities",
+        "mediaSlots": {
+            "video": {
+                "mediaType": "video",
+                "isOptional": false
+            }
+        }
+    },
+    "firstClass": {
+        "document": "Document",
+        "segment": "Segment",
+        "token": "Token"
+    },
+    "layer": {
+        "Token": {
+            "abstract": false,
+            "layerType": "unit",
+            "anchoring": {
+                "location": false,
+                "stream": true,
+                "time": true
+            },
+            "attributes": {
+                "form": {
+                    "isGlobal": false,
+                    "type": "text",
+                    "nullable": true
+                },
+                "lemma": {
+                    "isGlobal": false,
+                    "type": "text",
+                    "nullable": false
+                },
+                "upos": {
+                    "isGlobal": true,
+                    "type": "categorical",
+                    "nullable": true
+                },
+                "xpos": {
+                    "isGlobal": false,
+                    "type": "categorical",
+                    "nullable": true
+                },
+                "ufeat": {
+                    "isGlobal": false,
+                    "type": "dict",
+                    "nullable": true
+                }
+            }
+        },
+        "DepRel": {
+            "abstract": true,
+            "layerType": "relation",
+            "attributes": {
+                "udep": {
+                    "type": "categorical",
+                    "isGlobal": true,
+                    "nullable": false
+                },
+                "source": {
+                    "name": "dependent",
+                    "entity": "Token",
+                    "nullable": false
+                },
+                "target": {
+                    "name": "head",
+                    "entity": "Token",
+                    "nullable": true
+                },
+                "left_anchor": {
+                    "type": "number",
+                    "nullable": false
+                },
+                "right_anchor": {
+                    "type": "number",
+                    "nullable": false
+                }
+            }
+        },
+        "NamedEntity": {
+            "abstract": false,
+            "layerType": "span",
+            "contains": "Token",
+            "attributes": {
+                "form": {
+                    "isGlobal": false,
+                    "type": "text",
+                    "nullable": false
+                },
+                "type": {
+                    "isGlobal": false,
+                    "type": "categorical",
+                    "nullable": true
+                }
+            }
+        },
+        "Shot": {
+            "abstract": false,
+            "layerType": "span",
+            "anchoring": {
+                "location": false,
+                "stream": false,
+                "time": true
+            },
+            "attributes": {
+                "view": {
+                    "isGlobal": false,
+                    "type": "categorical",
+                    "nullable": false
+                }
+            }
+        },
+        "Segment": {
+            "abstract": false,
+            "layerType": "span",
+            "contains": "Token",
+            "attributes": {
+                "meta": {
+                    "text": {
+                        "type": "text"
+                    },
+                    "start": {
+                        "type": "text"
+                    },
+                    "end": {
+                        "type": "text"
+                    }
+                }
+            }
+        },
+        "Document": {
+            "abstract": false,
+            "contains": "Segment",
+            "layerType": "span",
+            "attributes": {
+                "meta": {
+                    "audio": {
+                        "type": "text",
+                        "isOptional": true
+                    },
+                    "video": {
+                        "type": "text",
+                        "isOptional": true
+                    },
+                    "start": {
+                        "type": "number"
+                    },
+                    "end": {
+                        "type": "number"
+                    },
+                    "name": {
+                        "type": "text"
+                    }
+                }
+            }
+        }
+    },
+    "tracks": {
+        "layers": {
+            "Shot": {},
+            "Segment": {},
+            "NamedEntity": {}
+        }
+    }
+}

@@ -33,6 +33,24 @@ class Lcpcli:
 
     def run(self) -> None:
 
+        if example_destination := self.kwargs.get("example"):
+            if not os.path.isdir(example_destination):
+                raise FileNotFoundError(
+                    f"Path '{example_destination}' is not a valid folder destination"
+                )
+            parent_dir = os.path.dirname(__file__)
+            example_path = os.path.join(parent_dir, "data", "free_video_corpus")
+            full_destination = os.path.join(example_destination, "free_video_corpus")
+            shutil.copytree(example_path, full_destination)
+            input_path = os.path.join(full_destination, "input")
+            output_path = os.path.join(full_destination, "output")
+            print(
+                f"""Example data files copied to {full_destination}.
+Use `lcpcli -i {input_path} -o {output_path} -m upload` to preprocess the data,
+then `lcpcli -c {output_path} -k $API_KEY -s $API_SECRET -p $PROJECT_NAME --live` to upload the corpus to LCP"""
+            )
+            return None
+
         upload = self.kwargs.get("api_key") and self.kwargs.get("secret")
         corpert: Corpert | None = None
 

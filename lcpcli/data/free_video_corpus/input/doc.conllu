@@ -1,0 +1,227 @@
+# global.columns = ID FORM LEMMA UPOS XPOS FEATS HEAD DEPREL DEPS MISC namedentity
+# newdoc id = Bunny
+# newdoc video = bunny.mp4
+# newdoc start = 0.00
+# newdoc end = 62.00
+
+# sent_id = en_partut-ud-736
+# start = 0.50
+# end = 1.50
+# text = Universal Declaration of Human Rights.
+1	Universal	universal	ADJ	A	Degree=Pos	2	amod	_	start=0.50|end=0.75	_
+2	Declaration	declare	NOUN	S	Number=Sing	0	root	_	start=0.78|end=0.95	_
+3	of	of	ADP	E	_	5	case	_	start=1.02|end=1.15	_
+4	Human	human	ADJ	A	Degree=Pos	5	amod	_	start=1.20|end=1.33	_
+5	Rights	right	NOUN	S	Number=Plur	2	nmod	_	SpaceAfter=No|start=1.35|end=1.44	_
+6	.	.	PUNCT	FS	_	2	punct	_	start=1.44|end=1.50	_
+
+# sent_id = en_partut-ud-737
+# start = 2.20
+# end = 4.25
+# text = Adopted and proclaimed by General Assembly resolution 217A (III) of 10 December 1948.
+1	Adopted	adopt	VERB	V	Tense=Past|VerbForm=Part	0	root	_	start=2.20|end=2.30	_
+2	and	and	CCONJ	CC	_	3	cc	_	start=2.30|end=2.35	_
+3	proclaimed	proclaim	VERB	V	Tense=Past|VerbForm=Part	1	conj	_	start=2.38|end=2.45	_
+4	by	by	ADP	E	_	7	case	_	start=2.45|end=2.50	_
+5	General	general	ADJ	A	Degree=Pos	6	amod	_	start=2.55|end=2.75	1
+6	Assembly	assembly	NOUN	S	Number=Sing	7	nmod	_	start=2.85|end=3.15	1
+7	resolution	resolution	NOUN	S	Number=Sing	3	obl	_	start=3.20|end=3.22	_
+8	217	217	NUM	N	NumType=Card	7	nummod	_	SpaceAfter=No|start=3.24|end=3.40	_
+9	A	A	X	X	_	8	dep	_	start=3.42|end=3.44	_
+10	(	(	PUNCT	FB	_	11	punct	_	SpaceAfter=No|start=3.44|end=3.45	_
+11	III	third	ADJ	NO	Degree=Pos|NumType=Ord	8	amod	_	SpaceAfter=No|start=3.47|end=3.53	_
+12	)	)	PUNCT	FB	_	11	punct	_	start=3.53|end=3.54	_
+13	of	of	ADP	E	_	14	case	_	start=3.55|end=3.62	_
+14	10	10	NUM	N	NumType=Card	7	nmod	_	start=3.75|end=4.07	2
+15	December	December	PROPN	SP	_	14	flat	_	start=4.09|end=4.13	2
+16	1948	1948	NUM	N	NumType=Card	14	flat	_	SpaceAfter=No|start=4.15|end=4.23	2
+17	.	.	PUNCT	FS	_	1	punct	_	start=4.24|end=4.25	_
+
+# sent_id = en_partut-ud-738
+# start = 4.75
+# end = 5.00
+# text = PREAMBLE.
+1	PREAMBLE	preamble	NOUN	S	Number=Sing	0	root	_	SpaceAfter=No|start=4.75|end=4.98	_
+2	.	.	PUNCT	FS	_	1	punct	_	start=4.98|end=4.99	_
+
+# sent_id = en_partut-ud-740
+# start = 7.00
+# end = 22.50
+# text = Whereas disregard and contempt for human rights have resulted in barbarous acts which have outraged the conscience of mankind, and the advent of a world in which human beings shall enjoy freedom of speech and belief and freedom from fear and want has been proclaimed as the highest aspiration of the common people;
+1	Whereas	whereas	SCONJ	CS	_	9	mark	_	start=7|end=7.28	_
+2	disregard	disregard	NOUN	S	Number=Sing	9	nsubj	_	start=7.28|end=7.56	_
+3	and	and	CCONJ	CC	_	4	cc	_	start=7.56|end=7.84	_
+4	contempt	contempt	NOUN	S	Number=Sing	2	conj	_	start=7.84|end=8.12	_
+5	for	for	ADP	E	_	7	case	_	start=8.12|end=8.40	_
+6	human	human	ADJ	A	Degree=Pos	7	amod	_	start=8.40|end=8.69	_
+7	rights	right	NOUN	S	Number=Plur	4	nmod	_	start=8.69|end=8.97	_
+8	have	have	AUX	VA	Mood=Ind|Number=Plur|Tense=Pres|VerbForm=Fin	9	aux	_	start=8.97|end=9.25	_
+9	resulted	result	VERB	V	Tense=Past|VerbForm=Part	0	root	_	start=9.25|end=9.53	_
+10	in	in	ADP	E	_	12	case	_	start=9.53|end=9.81	_
+11	barbarous	barbarous	ADJ	A	Degree=Pos	12	amod	_	start=9.81|end=10.1	_
+12	acts	act	NOUN	S	Number=Plur	9	obl	_	start=10.1|end=10.38	_
+13	which	which	PRON	PR	PronType=Rel	15	nsubj	_	start=10.38|end=10.66	_
+14	have	have	AUX	VA	Mood=Ind|Number=Plur|Tense=Pres|VerbForm=Fin	15	aux	_	start=10.66|end=10.94	_
+15	outraged	outrage	VERB	V	Tense=Past|VerbForm=Part	12	acl:relcl	_	start=10.94|end=11.22	_
+16	the	the	DET	RD	Definite=Def|PronType=Art	17	det	_	start=11.22|end=11.50	_
+17	conscience	conscience	NOUN	S	Number=Sing	15	obj	_	start=11.50|end=11.79	_
+18	of	of	ADP	E	_	19	case	_	start=11.79|end=12.07	_
+19	mankind	mankind	NOUN	S	Number=Sing	17	nmod	_	SpaceAfter=No|start=12.07|end=12.35	_
+20	,	,	PUNCT	FF	_	46	punct	_	start=12.35|end=12.63	_
+21	and	and	CCONJ	CC	_	46	cc	_	start=12.63|end=12.91	_
+22	the	the	DET	RD	Definite=Def|PronType=Art	23	det	_	start=12.91|end=13.2	_
+23	advent	advent	NOUN	S	Number=Sing	46	nsubj:pass	_	start=13.2|end=13.48	_
+24	of	of	ADP	E	_	26	case	_	start=13.48|end=13.76	_
+25	a	a	DET	RI	Definite=Ind|Number=Sing|PronType=Art	26	det	_	start=13.76|end=14.04	_
+26	world	world	NOUN	S	Number=Sing	23	nmod	_	start=14.04|end=14.32	_
+27	in	in	ADP	E	_	28	case	_	start=14.32|end=14.60	_
+28	which	which	PRON	PR	PronType=Rel	32	obl	_	start=14.60|end=14.89	_
+29	human	human	ADJ	A	Degree=Pos	30	amod	_	start=14.89|end=15.17	_
+30	beings	being	NOUN	S	Number=Plur	32	nsubj	_	start=15.17|end=15.45	_
+31	shall	shall	AUX	VM	Mood=Ind|Person=3|Tense=Pres|VerbForm=Fin	32	aux	_	start=15.45|end=15.73	_
+32	enjoy	enjoy	VERB	V	VerbForm=Inf	26	acl:relcl	_	start=15.73|end=16.01	_
+33	freedom	freedom	NOUN	S	Number=Sing	32	obj	_	start=16.01|end=16.3	_
+34	of	of	ADP	E	_	35	case	_	start=16.3|end=16.58	_
+35	speech	speech	NOUN	S	Number=Sing	33	nmod	_	start=16.58|end=16.86	_
+36	and	and	CCONJ	CC	_	37	cc	_	start=16.86|end=17.14	_
+37	belief	belief	NOUN	S	Number=Sing	35	conj	_	start=17.14|end=17.42	_
+38	and	and	CCONJ	CC	_	39	cc	_	start=17.42|end=17.70	_
+39	freedom	freedom	NOUN	S	Number=Sing	33	conj	_	start=17.70|end=17.99	_
+40	from	from	ADP	E	_	41	case	_	start=17.99|end=18.27	_
+41	fear	fear	NOUN	S	Number=Sing	39	nmod	_	start=18.27|end=18.55	_
+42	and	and	CCONJ	CC	_	43	cc	_	start=18.55|end=18.83	_
+43	want	want	NOUN	S	Number=Sing	41	conj	_	start=18.83|end=19.11	_
+44	has	have	AUX	VA	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	46	aux	_	start=19.11|end=19.4	_
+45	been	be	AUX	VA	Tense=Past|VerbForm=Part	46	aux:pass	_	start=19.4|end=19.68	_
+46	proclaimed	proclaim	VERB	V	Tense=Past|VerbForm=Part	9	conj	_	start=19.68|end=19.96	_
+47	as	as	ADP	E	_	50	case	_	start=19.96|end=20.24	_
+48	the	the	DET	RD	Definite=Def|PronType=Art	50	det	_	start=20.24|end=20.52	_
+49	highest	highest	ADJ	A	Degree=Sup	50	amod	_	start=20.52|end=20.80	_
+50	aspiration	aspiration	NOUN	S	Number=Sing	46	obl	_	start=20.80|end=21.09	_
+51	of	of	ADP	E	_	54	case	_	start=21.09|end=21.37	_
+52	the	the	DET	RD	Definite=Def|PronType=Art	54	det	_	start=21.37|end=21.65	_
+53	common	common	ADJ	A	Degree=Pos	54	amod	_	start=21.65|end=21.93	_
+54	people	people	NOUN	S	Number=Plur	50	nmod	_	SpaceAfter=No|start=21.93|end=22.21	_
+55	;	;	PUNCT	FC	_	9	punct	_	start=22.21|end=22.5	_
+
+# sent_id = en_partut-ud-741
+# start = 28.00
+# end = 42.40
+# text = Whereas it is essential, if man is not to be compelled to have recourse, as a last resort, to rebellion against tyranny and oppression, that human rights should be protected by the rule of law;
+1	Whereas	whereas	SCONJ	CS	_	4	mark	_	start=28|end=28.36	_
+2	it	it	PRON	PE	Number=Sing|Person=3|PronType=Prs	4	expl	_	start=28.36|end=28.72	_
+3	is	be	AUX	V	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	4	cop	_	start=28.72|end=29.08	_
+4	essential	essential	ADJ	A	Degree=Pos	0	root	_	SpaceAfter=No|start=29.08|end=29.44	_
+5	,	,	PUNCT	FF	_	4	punct	_	start=29.44|end=29.8	_
+6	if	if	SCONJ	CS	_	8	mark	_	start=29.8|end=30.16	_
+7	man	man	NOUN	S	Gender=Masc|Number=Sing	8	nsubj	_	start=30.16|end=30.52	_
+8	is	be	VERB	V	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	4	advcl	_	start=30.52|end=30.88	_
+9	not	not	PART	PART	Polarity=Neg	8	advmod	_	start=30.88|end=31.24	_
+10	to	to	PART	PART	_	12	mark	_	start=31.24|end=31.6	_
+11	be	be	AUX	VA	VerbForm=Inf	12	aux:pass	_	start=31.6|end=31.96	_
+12	compelled	compel	VERB	V	Tense=Past|VerbForm=Part	8	xcomp	_	start=31.96|end=32.32	_
+13	to	to	PART	PART	_	14	mark	_	start=32.32|end=32.68	_
+14	have	have	VERB	V	VerbForm=Inf	12	xcomp	_	start=32.68|end=33.04	_
+15	recourse	recourse	NOUN	S	Number=Sing	14	obj	_	SpaceAfter=No|start=33.04|end=33.4	_
+16	,	,	PUNCT	FF	_	15	punct	_	start=33.4|end=33.76	_
+17	as	as	ADP	E	_	20	case	_	start=33.76|end=34.12	_
+18	a	a	DET	RI	Definite=Ind|Number=Sing|PronType=Art	20	det	_	start=34.12|end=34.48	_
+19	last	last	ADJ	NO	Degree=Pos|NumType=Ord	20	amod	_	start=34.48|end=34.83	_
+20	resort	resort	NOUN	S	Number=Sing	15	nmod	_	SpaceAfter=No|start=34.83|end=35.2	_
+21	,	,	PUNCT	FF	_	15	punct	_	start=35.2|end=35.56	_
+22	to	to	ADP	E	_	23	case	_	start=35.56|end=35.92	_
+23	rebellion	rebellion	NOUN	S	Number=Sing	15	nmod	_	start=35.92|end=36.28	_
+24	against	against	ADP	E	_	25	case	_	start=36.28|end=36.64	_
+25	tyranny	tyranny	NOUN	S	Number=Sing	23	nmod	_	start=36.64|end=37	_
+26	and	and	CCONJ	CC	_	27	cc	_	start=37|end=37.36	_
+27	oppression	oppression	NOUN	S	Number=Sing	25	conj	_	SpaceAfter=No|start=37.36|end=37.72	_
+28	,	,	PUNCT	FF	_	4	punct	_	start=37.72|end=38.08	_
+29	that	that	SCONJ	CS	_	34	mark	_	start=38.08|end=38.44	_
+30	human	human	ADJ	A	Degree=Pos	31	amod	_	start=38.44|end=38.8	_
+31	rights	right	NOUN	S	Number=Plur	34	nsubj:pass	_	start=38.8|end=39.16	_
+32	should	shall	AUX	VM	Mood=Ind|Person=3|Tense=Past|VerbForm=Fin	34	aux	_	start=39.16|end=39.51	_
+33	be	be	AUX	VA	VerbForm=Inf	34	aux:pass	_	start=39.51|end=39.87	_
+34	protected	protect	VERB	V	Tense=Past|VerbForm=Part	4	csubj	_	start=39.87|end=40.23	_
+35	by	by	ADP	E	_	37	case	_	start=40.23|end=40.59	_
+36	the	the	DET	RD	Definite=Def|PronType=Art	37	det	_	start=40.59|end=40.96	_
+37	rule	rule	NOUN	S	Number=Sing	34	obl	_	start=40.96|end=41.32	_
+38	of	of	ADP	E	_	39	case	_	start=41.32|end=41.68	_
+39	law	law	NOUN	S	Number=Sing	37	nmod	_	SpaceAfter=No|start=41.68|end=42.04	_
+40	;	;	PUNCT	FC	_	4	punct	_	start=42.04|end=42.4	_
+
+# sent_id = en_partut-ud-742
+# start = 44.33
+# end = 50.20
+# text = Whereas it is essential to promote the development of friendly relations between nations;
+1	Whereas	whereas	SCONJ	CS	_	4	mark	_	start=44.33|end=44.74	_
+2	it	it	PRON	PE	Number=Sing|Person=3|PronType=Prs	4	expl	_	start=44.74|end=45.16	_
+3	is	be	AUX	V	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	4	cop	_	start=45.16|end=45.58	_
+4	essential	essential	ADJ	A	Degree=Pos	0	root	_	start=45.58|end=46.00	_
+5	to	to	PART	PART	_	6	mark	_	start=46.00|end=46.42	_
+6	promote	promote	VERB	V	VerbForm=Inf	4	csubj	_	start=46.42|end=46.84	_
+7	the	the	DET	RD	Definite=Def|PronType=Art	8	det	_	start=46.84|end=47.26	_
+8	development	development	NOUN	S	Number=Sing	6	obj	_	start=47.26|end=47.68	_
+9	of	of	ADP	E	_	11	case	_	start=47.68|end=48.10	_
+10	friendly	friendly	ADJ	A	Degree=Pos	11	amod	_	start=48.10|end=48.52	_
+11	relations	relation	NOUN	S	Number=Plur	8	nmod	_	start=48.52|end=48.94	_
+12	between	between	ADP	E	_	13	case	_	start=48.94|end=49.36	_
+13	nations	nation	NOUN	S	Number=Plur	11	nmod	_	SpaceAfter=No|start=49.36|end=49.78	_
+14	;	;	PUNCT	FC	_	4	punct	_	start=49.78|end=50.2	_
+
+# sent_id = en_partut-ud-743
+# start = 51.10
+# end = 61.50
+# text = Whereas the peoples of the United Nations have in the Charter reaffirmed their faith in fundamental human rights, in the dignity and worth of the human person and in the equal rights of men and women and have determined to promote social progress and better standards of life in larger freedom;
+1	Whereas	whereas	SCONJ	CS	_	12	mark	_	start=51.1|end=51.29	_
+2	the	the	DET	RD	Definite=Def|PronType=Art	3	det	_	start=51.29|end=51.49	_
+3	peoples	people	NOUN	S	Number=Plur	12	nsubj	_	start=51.49|end=51.68	_
+4	of	of	ADP	E	_	6	case	_	start=51.68|end=51.88	_
+5	the	the	DET	RD	Definite=Def|PronType=Art	6	det	_	start=51.88|end=52.08	_
+6	United	United	PROPN	SP	_	3	nmod	_	start=52.08|end=52.27	3
+7	Nations	Nations	PROPN	SP	_	6	flat	_	start=52.27|end=52.47	3
+8	have	have	AUX	VA	Mood=Ind|Number=Plur|Tense=Pres|VerbForm=Fin	12	aux	_	start=52.47|end=52.66	_
+9	in	in	ADP	E	_	11	case	_	start=52.66|end=52.86	_
+10	the	the	DET	RD	Definite=Def|PronType=Art	11	det	_	start=52.86|end=53.06	_
+11	Charter	charter	NOUN	S	Number=Sing	12	obl	_	start=53.06|end=53.25	4
+12	reaffirmed	reaffirm	VERB	V	Tense=Past|VerbForm=Part	0	root	_	start=53.25|end=53.45	_
+13	their	their	DET	AP	Poss=Yes|PronType=Prs	14	nmod:poss	_	start=53.45|end=53.65	_
+14	faith	faith	NOUN	S	Number=Sing	12	obj	_	start=53.65|end=53.84	_
+15	in	in	ADP	E	_	18	case	_	start=53.84|end=54.04	_
+16	fundamental	fundamental	ADJ	A	Degree=Pos	18	amod	_	start=54.04|end=54.23	_
+17	human	human	ADJ	A	Degree=Pos	18	amod	_	start=54.23|end=54.43	_
+18	rights	right	NOUN	S	Number=Plur	14	nmod	_	SpaceAfter=No|start=54.43|end=54.63	_
+19	,	,	PUNCT	FF	_	22	punct	_	start=54.63|end=54.82	_
+20	in	in	ADP	E	_	22	case	_	start=54.82|end=55.02	_
+21	the	the	DET	RD	Definite=Def|PronType=Art	22	det	_	start=55.02|end=55.22	_
+22	dignity	dignity	NOUN	S	Number=Sing	18	conj	_	start=55.22|end=55.41	_
+23	and	and	CCONJ	CC	_	24	cc	_	start=55.41|end=55.61	_
+24	worth	worth	NOUN	S	Number=Sing	18	conj	_	start=55.61|end=55.80	_
+25	of	of	ADP	E	_	28	case	_	start=55.80|end=56.00	_
+26	the	the	DET	RD	Definite=Def|PronType=Art	28	det	_	start=56.00|end=56.20	_
+27	human	human	ADJ	A	Degree=Pos	28	amod	_	start=56.20|end=56.39	_
+28	person	person	NOUN	S	Number=Sing	24	nmod	_	start=56.39|end=56.59	_
+29	and	and	CCONJ	CC	_	33	cc	_	start=56.59|end=56.79	_
+30	in	in	ADP	E	_	33	case	_	start=56.79|end=56.98	_
+31	the	the	DET	RD	Definite=Def|PronType=Art	33	det	_	start=56.98|end=57.18	_
+32	equal	equal	ADJ	A	Degree=Pos	33	amod	_	start=57.18|end=57.37	_
+33	rights	right	NOUN	S	Number=Plur	18	conj	_	start=57.37|end=57.57	_
+34	of	of	ADP	E	_	35	case	_	start=57.57|end=57.77	_
+35	men	man	NOUN	S	Gender=Masc|Number=Plur	33	nmod	_	start=57.77|end=57.96	_
+36	and	and	CCONJ	CC	_	37	cc	_	start=57.96|end=58.16	_
+37	women	women	NOUN	S	Gender=Fem|Number=Sing	35	conj	_	start=58.16|end=58.36	_
+38	and	and	CCONJ	CC	_	40	cc	_	start=58.36|end=58.55	_
+39	have	have	AUX	VA	Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin	40	aux	_	start=58.55|end=58.75	_
+40	determined	determine	VERB	V	Tense=Past|VerbForm=Part	12	conj	_	start=58.75|end=58.94	_
+41	to	to	PART	PART	_	42	mark	_	start=58.94|end=59.14	_
+42	promote	promote	VERB	V	VerbForm=Inf	40	advcl	_	start=59.14|end=59.34	_
+43	social	social	ADJ	A	Degree=Pos	44	amod	_	start=59.34|end=59.53	_
+44	progress	progress	NOUN	S	Number=Sing	42	obj	_	start=59.53|end=59.73	_
+45	and	and	CCONJ	CC	_	47	cc	_	start=59.73|end=59.93	_
+46	better	better	ADJ	A	Degree=Cmp	47	amod	_	start=59.93|end=60.12	_
+47	standards	standard	NOUN	S	Number=Plur	44	conj	_	start=60.12|end=60.32	_
+48	of	of	ADP	E	_	49	case	_	start=60.32|end=60.51	_
+49	life	life	NOUN	S	Number=Sing	47	nmod	_	start=60.51|end=60.71	_
+50	in	in	ADP	E	_	52	case	_	start=60.71|end=60.91	_
+51	larger	larger	ADJ	A	Degree=Cmp	52	amod	_	start=60.91|end=61.10	_
+52	freedom	freedom	NOUN	S	Number=Sing	42	obl	_	SpaceAfter=No|start=61.10|end=61.30	_
+53	;	;	PUNCT	FC	_	12	punct	_	start=61.30|end=61.5	_
