@@ -330,7 +330,7 @@ def check_template_and_send(
     url = UPLOAD_URL if live else UPLOAD_URL_TEST
     if to:
         url = f"{to}/upload"
-    resp = requests.post(url, params=jso, headers=headers, files=files)  # type: ignore
+    resp = requests.post(url, params=jso, headers=headers, files=files, verify=False)  # type: ignore
     print("files", files)
 
     time.sleep(5)

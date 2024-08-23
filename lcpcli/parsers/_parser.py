@@ -603,7 +603,8 @@ class Parser(abc.ABC):
                 token_table.cursor += 1
 
             segment_table = self._tables["segment"]
-            if segment_table.cursor == 1:
+            # if segment_table.cursor == 1:
+            if not segment_table.col_names:
                 col_names = [f"{seg_name}_id", "char_range"]
                 if has_frame_range:
                     col_names.append("frame_range")
@@ -613,6 +614,7 @@ class Parser(abc.ABC):
                         continue
                     col_names.append(a)
                 segment_table.write(col_names)
+                segment_table.col_names = col_names
             cols = [str(segment.id)]
             cols.append(f"[{char_range_segment_start},{self.char_range_cur-1})")
             if has_frame_range:
@@ -628,6 +630,8 @@ class Parser(abc.ABC):
                 if aname_low in aligned_entities_segment:
                     self.aligned_entity(segment, path, a, aligned_entities_segment)
                 else:
+                    if a.name not in segment_table.col_names:
+                        continue
                     cols.append(a.value)
                     if a.name not in segment_table.categorical_values:
                         segment_table.categorical_values[a.name] = set()
@@ -666,7 +670,8 @@ class Parser(abc.ABC):
                             attributes_to_fts.append(a)
                             attributes_to_fts.append(a)
                     for i, a in enumerate(attributes_to_fts, start=1):
-                        vector.append(f"'{i}{str(a.value)}':{n}")
+                        vl = re.sub(r"'", "''", a.value)
+                        vector.append(f"'{i}{vl}':{n}")
                 cols[1:] = [" ".join(vector)]
                 if fts_table.cursor == 1:
                     fts_table.write([f"{seg_name}_id", "vector"])

@@ -104,6 +104,7 @@ class CONLLUParser(Parser):
                         new_doc["meta"][key] = value
             elif match := re.match(r"# sent_id = (.+)", line):
                 current_sentence["id"] = match[1]
+                current_sentence["meta"]["sent_id"] = match[1]
             elif match := re.match(r"#\s+([^=]+)\s+= (.+)", line):
                 current_sentence["meta"][match[1]] = match[2].strip()
             elif re.match(r"\d+[\t\s]", line):

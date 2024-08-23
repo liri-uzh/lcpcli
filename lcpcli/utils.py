@@ -426,7 +426,7 @@ class Table:
         self.cursor = 1
         self.current_entity = dict()
         self.previous_entity = None
-        self.colNames = ([],)
+        self.col_names = []
         self.labels = dict()
         self.texts = dict()
         self.deps = dict()
