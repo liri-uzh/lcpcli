@@ -60,6 +60,7 @@ then `lcpcli -c {output_path} -k $API_KEY -s $API_SECRET -p $PROJECT_NAME --live
             corpert.run()
 
         if not upload:
+            print("No upload key or secret passed, exiting now.")
             return None
 
         if corpert and self.kwargs.get("mode", "") == "upload":

@@ -213,6 +213,51 @@ class Parser(abc.ABC):
         for s_id in empty_segments:
             table.deps.pop(s_id)
 
+    def read_aligned_entity(
+        self, fk: str, fn: str, table, layer_attributes, aname_low
+    ) -> list[str]:
+        ce_cols: list[str] = []
+        # Read the content of the entity from the provided file
+        with open(fn, "r") as aligned_file:
+            while 1:
+                sline = aligned_file.readline()
+                if not sline:
+                    break
+                line = sline.split("\t")
+                if line[0].strip() == fk:
+                    for n, col in enumerate(line[1:]):
+                        col_name = table.col_names[n]
+                        attr_name = next(
+                            (
+                                x
+                                for x in layer_attributes
+                                if x.lower() == col_name
+                                or x.lower() + "_id" == col_name
+                            ),
+                            col_name,
+                        )
+                        ctype = layer_attributes.get(attr_name, {}).get("type")
+                        if ctype == "text":
+                            lookup_table = self._tables[f"{aname_low}_{col_name}"]
+                            ce_cols.append(lookup_table.get_id(col.strip()))
+                        elif ctype == "labels":
+                            bits = int("0", 2)
+                            for label in col.split(","):
+                                l = label.strip()
+                                idx = table.labels.get(l, len(table.labels))
+                                table.labels[l] = idx
+                                bs = "1" + "".join(["0" for _ in range(idx - 1)])
+                                bits = bits | int(bs, 2)
+                            ce_cols.append(bin(bits)[2:])
+                        else:
+                            ce_cols.append(col.strip())
+                        if ctype == "categorical":
+                            if attr_name not in table.categorical_values:
+                                table.categorical_values[attr_name] = set()
+                            table.categorical_values[attr_name].add(col.strip())
+                    break
+        return ce_cols
+
     def aligned_entity(self, entity, path, attribute, aligned_entities={}):
         aname_low = attribute.name.lower()
         assert isinstance(attribute, Text), TypeError(
@@ -265,20 +310,6 @@ class Parser(abc.ABC):
             # No longer processing the previous entity
             if ce:
                 entity_cols = ce["cols"]
-                # Process labels
-                lbls = table.labels
-                for n, col_name in enumerate(table.col_names):
-                    ctype = layer_attributes.get(col_name, {}).get("type", "")
-                    if ctype != "labels":
-                        continue
-                    bits = int("0", 2)
-                    for label in entity_cols[n].split(","):
-                        l = label.strip()
-                        idx = lbls.get(l, len(lbls))
-                        lbls[l] = idx
-                        bs = "1" + "".join(["0" for _ in range(idx - 1)])
-                        bits = bits | int(bs, 2)
-                    entity_cols[n] = bin(bits)[2:]
                 range_up = self.char_range_cur - 1  # Stop just before this entity
                 if range_up <= int(ce["range_low"]):
                     range_up = int(ce["range_low"]) + 1
@@ -304,40 +335,15 @@ class Parser(abc.ABC):
                 ce = {}
             else:
                 ce = {"id": fk}
-                # Read the content of the entity from the provided file
-                with open(aligned_entities[aname_low]["fn"], "r") as aligned_file:
-                    while True:
-                        line = aligned_file.readline()
-                        if not line:
-                            break
-                        line = line.split("\t")
-                        if line[0].strip() == fk:
-                            ce["cols"] = []
-                            for n, col in enumerate(line[1:]):
-                                col_name = table.col_names[n]
-                                attr_name = next(
-                                    (
-                                        x
-                                        for x in layer_attributes
-                                        if x.lower() == col_name
-                                        or x.lower() + "_id" == col_name
-                                    ),
-                                    col_name,
-                                )
-                                ctype = layer_attributes.get(attr_name, {}).get("type")
-                                if ctype == "text":
-                                    lookup_table = self._tables[
-                                        f"{aname_low}_{col_name}"
-                                    ]
-                                    ce["cols"].append(lookup_table.get_id(col.strip()))
-                                else:
-                                    ce["cols"].append(col.strip())
-                                if ctype == "categorical":
-                                    if attr_name not in table.categorical_values:
-                                        table.categorical_values[attr_name] = set()
-                                    table.categorical_values[attr_name].add(col.strip())
-                            ce["range_low"] = str(self.char_range_cur)
-                            break
+                attribute_fn = aligned_entities[aname_low]["fn"]
+                table.aligned_cols[fk] = table.aligned_cols.get(
+                    fk,
+                    self.read_aligned_entity(
+                        fk, attribute_fn, table, layer_attributes, aname_low
+                    ),
+                )
+                ce["cols"] = [*table.aligned_cols[fk]]  # copy prevents overwriting
+                ce["range_low"] = str(self.char_range_cur)
                 if has_frame_range:
                     ce["frame_range_start"] = str(self.frame_range_cur)
             table.current_entity = ce
@@ -374,7 +380,7 @@ class Parser(abc.ABC):
             if not label_attributes:
                 continue
             with open(tab.path, "r") as input, open(tab.path + ".tmp", "w") as output:
-                while True:
+                while 1:
                     il = input.readline()
                     if not il:
                         break
@@ -487,12 +493,12 @@ class Parser(abc.ABC):
                 col_names[f"{seg_name}_id"] = None
                 token_table.write([c for c in col_names])
 
-            print(
-                "segment",
-                segment.id,
-                "meta",
-                segment.attributes.get("meta", Meta("dummy", "dummy")).value,
-            )
+            # print(
+            #     "segment",
+            #     segment.id,
+            #     "meta",
+            #     segment.attributes.get("meta", Meta("dummy", "dummy")).value,
+            # )
             for token in segment.tokens:
                 cols = [str(token_table.cursor)]
                 for attr_name in non_null_attributes:

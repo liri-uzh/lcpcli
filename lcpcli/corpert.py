@@ -3,6 +3,8 @@ import json
 import os
 import shutil
 
+from time import time
+
 from .parsers.conllu import CONLLUParser
 from .parsers.vert import VERTParser
 from .parsers.tei import TEIParser
@@ -93,10 +95,12 @@ class Corpert:
         if os.path.isfile(content):
             self._input_files.append(content)
         elif os.path.isdir(content):
-            for root, dirs, files in os.walk(content):
-                for file in files:
-                    fullpath = os.path.join(root, file)
-                    self._input_files.append(fullpath)
+            # for root, dirs, files in os.walk(content):
+            for file in os.listdir(content):
+                # for file in files:
+                # fullpath = os.path.join(root, file)
+                fullpath = os.path.join(content, file)
+                self._input_files.append(fullpath)
         elif isinstance(content, str):
             self._input_files.append(content)
             self._on_disk = False
@@ -201,6 +205,8 @@ class Corpert:
         # sents = []
         # docs = []
 
+        self.mode = "upload"  # only support upload mode for now
+
         if self.mode == "upload":
             ignore_files = set()
             json_obj = None
@@ -296,33 +302,44 @@ class Corpert:
                     }
             parser = None
             # Process the remaining input files
-            for filepath in self._input_files:
-                if filepath in ignore_files:
-                    continue
-                fn_before_ext = Path(filepath).stem
-                if fn_before_ext.lower() in {
-                    k.lower() for k in json_obj.get("layer", {})
-                }:
-                    continue
-                print("input file", filepath)
-                if not os.path.isfile(filepath):
-                    print(f"Not a file: ignoring '{filepath}'")
-                    continue
-                if os.path.basename(filepath) == "meta.json":
-                    continue
+            doc_files = [
+                f
+                for f in self._input_files
+                if (
+                    os.path.isfile(f)
+                    and f not in ignore_files
+                    and os.path.basename(f) != "meta.json"
+                    # discard files named like layer names
+                    and Path(f).stem.lower()
+                    not in {k.lower() for k in json_obj.get("layer", {})}
+                )
+            ]
+            nfiles = len(doc_files)
+            start_time_input_files = time()
+            for nfile, filepath in enumerate(doc_files, start=1):
+                elapsed_time = time() - start_time_input_files
+                print(
+                    "input file",
+                    filepath,
+                    f" ({nfile}/{nfiles}; elapsed {round(elapsed_time, 2)}s;",
+                    f"remaining {round((elapsed_time / nfile) * (nfiles - nfile))}s)",
+                )
                 parser = parser or PARSERS[self._determine_format(filepath)](
                     config=json_obj
                 )
                 print(filepath)
-                with open(filepath, "r") as f:
-                    parser.generate_upload_files_generator(
-                        f,
-                        path=self.output or "./",
-                        default_doc={"name": os.path.basename(filepath)},
-                        config=json_obj,
-                        aligned_entities=aligned_entities,
-                        aligned_entities_segment=aligned_entities_segment,
-                    )
+                try:
+                    with open(filepath, "r") as f:
+                        parser.generate_upload_files_generator(
+                            f,
+                            path=self.output or "./",
+                            default_doc={"name": os.path.basename(filepath)},
+                            config=json_obj,
+                            aligned_entities=aligned_entities,
+                            aligned_entities_segment=aligned_entities_segment,
+                        )
+                except Exception as err:
+                    print("Could not process", filepath, ": ", err)
             parser.close_upload_files(
                 path=self.output or "./",
             )
@@ -340,9 +357,14 @@ class Corpert:
                 doc_id_idx = 0
                 start_idx = 0
                 end_idx = 0
-                with open(os.path.join(self._path, fn), "r") as input_file, open(
-                    os.path.join(output_path, fn), "w"
-                ) as output_file:
+                output_fn = os.path.join(output_path, fn)
+                assert not os.path.exists(output_fn), FileExistsError(
+                    f"The output file '{output_fn}' already exists."
+                )
+                with (
+                    open(os.path.join(self._path, fn), "r") as input_file,
+                    open(output_fn, "w") as output_file,
+                ):
                     while input_line := input_file.readline():
                         input_cols = input_line.rstrip("\n").split("\t")
                         output_cols = []

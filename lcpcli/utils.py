@@ -421,7 +421,10 @@ class Table:
     def __init__(self, name, path, config={}):
         self.name = name
         self.path = os.path.join(path, f"{name}.csv")
-        self.file = open(self.path, "a")
+        assert not os.path.exists(self.path), FileExistsError(
+            f"Output file '{self.path}' already exists."
+        )
+        self.file = open(self.path, "w")
         self.config = config
         self.cursor = 1
         self.current_entity = dict()
@@ -435,6 +438,7 @@ class Table:
         self.quote = f"\b"
         self.trigger_character = "'"
         self.categorical_values: dict[str, set] = {}
+        self.aligned_cols: dict[str, list[str]] = dict()  # {fk: [cols]}
 
     def write(self, row: list):
         self.file.write(

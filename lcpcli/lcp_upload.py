@@ -16,8 +16,10 @@ from tqdm import tqdm
 from .cli import _parse_cmd_line
 from .utils import get_file_from_base
 
-CREATE_URL = "https://lcp.test.linguistik.uzh.ch/create"
-UPLOAD_URL = "https://lcp.test.linguistik.uzh.ch/upload"
+# CREATE_URL = "https://lcp.test.linguistik.uzh.ch/create"
+# UPLOAD_URL = "https://lcp.test.linguistik.uzh.ch/upload"
+CREATE_URL = "https://lcp.linguistik.uzh.ch/create"
+UPLOAD_URL = "https://lcp.linguistik.uzh.ch/upload"
 CREATE_URL_TEST = "http://localhost:9090/create"
 UPLOAD_URL_TEST = "http://localhost:9090/upload"
 
@@ -37,7 +39,7 @@ def lcp_upload(
     project: str | None = None,
     vian: bool = False,
     live: bool = False,
-    to: str = "",
+    provided_url: str = "",
     check_only: bool = False,
     **kwargs,
 ) -> None:
@@ -156,7 +158,7 @@ def lcp_upload(
         with open(os.path.join(corpus, doc_fn), "r") as doc_file:
             media_ncol = -1
             nline = 0
-            while True:
+            while 1:
                 line = doc_file.readline()
                 nline += 1
                 if not line:
@@ -191,11 +193,13 @@ def lcp_upload(
 
     print("Sending template...")
     url = CREATE_URL if live else CREATE_URL_TEST
-    if to:
-        url = f"{to}/create"
+    if provided_url:
+        url = provided_url.removesuffix("/") + "/create"
     resp = requests.post(url, headers=headers, json=jso)  # type: ignore
     data = resp.json()
-    ret = check_template_and_send(data, headers, jso, corpus, base, filt, live, to=to)
+    ret = check_template_and_send(
+        data, headers, jso, corpus, base, filt, live, provided_url=provided_url
+    )
     if not ret:
         return
     if not monitor_upload(*ret):
@@ -203,7 +207,9 @@ def lcp_upload(
 
     status, error = ("finished", "")
     if has_media:
-        status, error = send_media(data, headers, jso, corpus, base, filt, live, to=to)
+        status, error = send_media(
+            data, headers, jso, corpus, base, filt, live, provided_url=provided_url
+        )
 
     if status != "finished":
         print(f"Media upload failed: {error}")
@@ -219,7 +225,7 @@ def send_media(
     base: str,
     filt: str | None,
     live: bool,
-    to: str = "",
+    provided_url: str = "",
 ) -> tuple[str, str]:
     """
     Poll /schema to check if schema is done, then send data
@@ -259,8 +265,8 @@ def send_media(
     print("Sending media data...")
 
     url = UPLOAD_URL if live else UPLOAD_URL_TEST
-    if to:
-        url = f"{to}/upload"
+    if provided_url:
+        url = provided_url.removesuffix("/") + "/upload"
     resp = requests.post(url, params=jso, headers=headers, files=files)  # type: ignore
 
     time.sleep(2)
@@ -277,7 +283,7 @@ def check_template_and_send(
     base: str,
     filt: str | None,
     live: bool,
-    to: str = "",
+    provided_url: str = "",
 ) -> tuple:
     """
     Poll /schema to check if schema is done, then send data
@@ -328,8 +334,8 @@ def check_template_and_send(
     print("Sending data...")
 
     url = UPLOAD_URL if live else UPLOAD_URL_TEST
-    if to:
-        url = f"{to}/upload"
+    if provided_url:
+        url = provided_url.removesuffix("/") + "/upload"
     resp = requests.post(url, params=jso, headers=headers, files=files, verify=False)  # type: ignore
     print("files", files)
 
@@ -337,7 +343,11 @@ def check_template_and_send(
 
     print("Checking corpus validity...")
 
-    data = resp.json()
+    try:
+        data = resp.json()
+    except Exception:
+        print("Error", resp)
+
     print("data", data)
     if "target" not in data:
         print(f"Failed:")

@@ -34,6 +34,8 @@ from ..utils import (
     Token,
 )
 
+RESERVED_KEYS = {"document": ["media"]}
+
 
 FEATURES = [
     "id",
@@ -96,6 +98,9 @@ class CONLLUParser(Parser):
                     new_doc["id"] = match[1]
                 elif match := re.match(r"# newdoc ([^=]+) = (.+)", line):
                     key = match[1].strip()
+                    assert key not in RESERVED_KEYS["document"], ValueError(
+                        "The attribute name 'media' is reserved; you cannot use it yourself"
+                    )
                     value = match[2].strip()
                     if mediaSlots and key in mediaSlots:
                         new_doc["media"] = new_doc.get("media", {})
@@ -187,6 +192,9 @@ class CONLLUParser(Parser):
             # if has_frame_range:
             #     assert all(t.frame_range is not None for t in sentence.tokens), AttributeError("Some tokens miss start-end time information")
 
+            if "id" not in current_sentence:
+                print("Warning: found a sentence with no sent_id")
+
             # sentence.tokens = current_sentence["text"]
             meta = current_sentence["meta"]
             if config:
@@ -208,7 +216,10 @@ class CONLLUParser(Parser):
                     if name + "_id" in meta:
                         name = name + "_id"
                     elif name not in meta:
-                        continue
+                        warning_msg = f"Warning: no value found for attribute '{name}' for segment {current_sentence.get('id','__ANONYMOUS__')}"
+                        print(warning_msg)
+                        meta[name] = ""
+                        # continue
                     a = meta.pop(name)
                     attr = Attribute(name, a)
                     if attr_props.get("type") == "categorical":
@@ -232,6 +243,7 @@ class CONLLUParser(Parser):
         if new_doc:
             ret_doc = Document()
             if id := new_doc.get("id"):
+                print(f"Parsing document '{id}'")
                 new_doc["meta"]["name"] = id
             ret_doc.attributes["meta"] = Meta("meta", new_doc["meta"])
             if new_doc.get("media"):
