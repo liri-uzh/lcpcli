@@ -4,7 +4,7 @@
 
 ## Installation
 
-Make sure you have python 3.11+ with `pip` installed in your local environment, then run
+Make sure you have python 3.11+ with `pip` installed in your local environment, then run:
 
 ```bash
 pip install lcpcli
@@ -26,30 +26,30 @@ lcpcli --help
 
 `lcpcli` takes a corpus of CoNLL-U (PLUS) files and imports it to a project created in an LCP instance, such as _catchphrase_.
 
-Besides the standard token-level CoNLL-U fields (`form`, `lemma`, `upos`, `xpos`, `feats`, `head`, `deprel`, `deps`) one can also provide document- and sentence-level annotations using comment lines in the files (see [the CoNLL-U Format section](#conll-u-format))
+Besides the standard token-level CoNLL-U fields (`form`, `lemma`, `upos`, `xpos`, `feats`, `head`, `deprel`, `deps`) one can also provide document- and sentence-level annotations using comment lines in the files (see [the CoNLL-U Format section](#conll-u-format)).
 
-A more advanced functionality, `lcpcli` supports annotations aligned at the character level, such as named entities. See [the Named Entities section](#named-entities) for more information
+A more advanced functionality, `lcpcli` supports annotations aligned at the character level, such as named entities. See [the Named Entities section](#named-entities) for more information.
 
 ### CoNLL-U Format
 
 The CoNLL-U format is documented at: https://universaldependencies.org/format.html
 
 The LCP CLI converter will treat all the comments that start with `# newdoc KEY = VALUE` as document-level attributes.
-This means that if a CoNLL-U file contains the line `# newdoc author = Jane Doe`, then in LCP all the sentences from this file will be associated with a document whose `meta` attribute will contain `author: 'Jane Doe'`
+This means that if a CoNLL-U file contains the line `# newdoc author = Jane Doe`, then in LCP all the sentences from this file will be associated with a document whose `meta` attribute will contain `author: 'Jane Doe'`.
 
-All other comment lines following the format `# key = value` will add an entry to the `meta` attribute of the _segment_ corresponding to the sentence below that line (ie not at the document level)
+All other comment lines following the format `# key = value` will add an entry to the `meta` attribute of the _segment_ corresponding to the sentence below that line (i.e. not at the document level).
 
 The key-value pairs in the `misc` column in a column line will go in the `meta` attribute of the corresponding token, with the exceptions of these key-value combinations:
  - `SpaceAfter=Yes` vs. `SpaceAfter=No` controls whether the token will be represented with a trailing space character in the database
  - `start=n.m|end=o.p` will align tokens, segments (sentences) and documents along a temporal axis, where `n.m` and `o.p` should be floating values in seconds
 
-See below how to report all the attributes in the template `.json` file
+See below how to report all the attributes in the template `.json` file.
 
 #### CoNLL-U PLUS
 
 CoNLL-U PLUS is an extension to the CoNLLU-U format documented at: https://universaldependencies.org/ext-format.html
 
-If your files start with a comment line of the form `# global.columns = ID FORM LEMMA UPOS XPOS FEATS HEAD DEPREL DEPS MISC`, `lcpcli` will treat them as CoNLL-U PLUS files and process the columns according to the names you set in that line
+If your files start with a comment line of the form `# global.columns = ID FORM LEMMA UPOS XPOS FEATS HEAD DEPREL DEPS MISC`, `lcpcli` will treat them as CoNLL-U PLUS files and process the columns according to the names you set in that line.
 
 #### Named Entities
 
@@ -112,7 +112,7 @@ Make sure to set the `abstract`, `layerType` and `contains` attributes as illust
 
 #### Other anchored entities
 
-Your corpus can include other entities besides tokens, sentences, documents and annotations that enter in a subset/superset relation with those. For example, a video corpus could include _gestures_ that are **time-anchored** but do not necessarily align with tokens or segments on the time axis (e.g. a gesture could start in the middle of a sentence and end some time after its end)
+Your corpus can include other entities besides tokens, sentences, documents and annotations that enter in a subset/superset relation with those. For example, a video corpus could include _gestures_ that are **time-anchored** but do not necessarily align with tokens or segments on the time axis (e.g. a gesture could start in the middle of a sentence and end some time after its end).
 
 In such a case, your template `.json` file should report that entity under `layer`, for example:
 
@@ -238,7 +238,7 @@ Finally, your **output** corpus folder should include a subfolder named `media` 
 
 ### Convert and Upload
 
-1. Create a directory in which you have all your properly-fromatted CONLLU files
+1. Create a directory in which you have all your properly-fromatted CONLLU files.
 
 2. In the same directory, create a template `.json` file that describes your corpus structure (see above about the `attributes` key on `Document` and `Segment`), for example:
 
@@ -374,15 +374,15 @@ Finally, your **output** corpus folder should include a subfolder named `media` 
 }
 ```
 
-3. If your corpus defines a character-anchored entity type such as named entities, make sure you also include a properly named and formatted TSV file for it in the directory (see [the Named Entities section](#named-entities))
+3. If your corpus defines a character-anchored entity type such as named entities, make sure you also include a properly named and formatted TSV file for it in the directory (see [the Named Entities section](#named-entities)).
 
-4. Visit an LCP instance (e.g. _catchphrase_) and create a new project if you don't already have one where your corpus should go
+4. Visit an LCP instance (e.g. _catchphrase_) and create a new project if you don't already have one where your corpus should go.
 
-5. Retrieve the API key and secret for your project by clicking on the button that says: "Create API Key"
+5. Retrieve the API key and secret for your project by clicking on the button that says: "Create API Key".
 
-    The secret will appear at the bottom of the page and remain visible only for 120s, after which it will disappear forever (you would then need to revoke the API key and create a new one)
+    The secret will appear at the bottom of the page and remain visible only for 120s, after which it will disappear forever (you would then need to revoke the API key and create a new one).
     
-    The key itself is listed above the button that says "Revoke API key" (make sure to **not** copy the line that starts with "Secret Key" along with the API key itself)
+    The key itself is listed above the button that says "Revoke API key" (make sure to **not** copy the line that starts with "Secret Key" along with the API key itself).
 
 6. Once you have your API key and secret, you can start converting and uploading your corpus by running the following command:
 
