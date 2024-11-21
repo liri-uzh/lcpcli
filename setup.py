@@ -12,7 +12,7 @@ def read(fname):
 
 setup(
     name="lcpcli",
-    version="0.1.6",
+    version="0.1.67",
     description="CLI tool combining LCP Upload and LCP Corpert",
     long_description=read("README.md"),
     long_description_content_type="text/markdown",

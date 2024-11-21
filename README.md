@@ -14,8 +14,16 @@ pip install lcpcli
 
 **Example:**
 
+Corpus conversion:
+
 ```bash
-lcpcli -i ~/conll_ext/ -o ~/upload/ -m upload -k $API_KEY -s $API_SECRET -p my_project
+lcpcli -i ~/conll_ext/ -o ~/upload/ -m upload
+```
+
+Data upload:
+
+```bash
+lcpcli -c ~/upload/ -k $API_KEY -s $API_SECRET -p my_project
 ```
 
 **Help:**
@@ -180,6 +188,9 @@ res => plain
         s
 ```
 
+Note that while the documents represent the top annotation level containing segments, one cannot prepare a `.tsv` file as just described here; all the document annotations must be directly reported in the conllu files using the `# newdoc key = value` as described in the section **CoNLL-U Format**.
+
+
 #### Time-aligned annotations
 
 Your corpus can also include annotations that do not strictly group entities together. The example video corpus includes an annotation named _shot_ that is **time-aligned** but does not necessarily align with tokens or segments on the time axis (e.g. a shot can start in the middle of a sentence and end some time after its end)
@@ -326,19 +337,37 @@ Your CoNLL-U file(s) should accordingly report each document's media file's name
 # newdoc video = bunny.mp4
 ```
 
-The `.json` template should also define a main key named `tracks` to control what annotations will be represented along the time axis. For example the following will report shot, segment and named entities in a timeline:
+The `.json` template should also define a main key named `tracks` to control what annotations will be represented along the time axis. For example the following will tell the interface to display separate timeline tracks for the shot, named entity and segment annotations, with the latter being subdivided in as many tracks as there are distinct values for the attribute `speaker` of the segments:
 
 ```json
 "tracks": {
     "layers": {
         "Shot": {},
-        "Segment": {},
-        "NamedEntity": {}
+        "NamedEntity": {},
+        "Segment": {
+            "split": [
+                "speaker"
+            ]
+        }
     }
 }
 ```
 
 Finally, your **output** corpus folder should include a subfolder named `media` in which all the referenced media files have been placed
+
+
+#### Attribute types
+
+
+The values of each attribute (on tokens, segments, documents or at any other level) have a **type**; the most common types are `text`, `number` or `categorical`. The attributes must be reported in the template `.json` file, along with their type (you can see an example in the section **Convert and Upload**)
+
+ - `text` vs `categorical`: while both types correspond to alpha-numerical values, `categorical` is meant for attributes that have a limited number of possible values (typically, less than 100 distinct values) of a limited length (as a rule of thumb, each value can have up to 50 characters). There is no such limits on values of attributes of type `text`. When a user starts typing a constraint on an attribute of type `categorical`, the DQD editor will offer autocompletition suggestions. The attributes of type `text` will have their values listed in a dedicated table (`lcpcli`'s conversion step produces corresponding `.tsv` files) so a query that expresses a constraint on an attribute will be slower if that attribute if of type `text` than of type `categorical`
+
+ - the type `labels` (with an `s` at the end) corresponds to a set of labels that users will be able to constrain in DQD using the `contain` keyword: for example, if an attribute named `genre` is of type `labels`, the user could write a constraint like `genre contain 'drama'` or `hobbies !contain 'comedy'`. The values of attributes of type `labels` should be one-line strings, with each value separated by a comma (`,`) character (as in, e.g., `# newdoc genre = drama, romance, coming of age, fiction`); as a consequence, no label can contain the character `,`.
+
+ - the type `dict` corresponds to key-values pairs as represented in JSON
+
+ - the type `date` requires values to be formatted in a way that can be parsed by PostgreSQL
 
 
 ### Convert and Upload

@@ -18,10 +18,8 @@ from .utils import get_file_from_base
 
 # CREATE_URL = "https://lcp.test.linguistik.uzh.ch/create"
 # UPLOAD_URL = "https://lcp.test.linguistik.uzh.ch/upload"
-CREATE_URL = "https://lcp.linguistik.uzh.ch/create"
-UPLOAD_URL = "https://lcp.linguistik.uzh.ch/upload"
-CREATE_URL_TEST = "http://localhost:9090/create"
-UPLOAD_URL_TEST = "http://localhost:9090/upload"
+CREATE_URL = "https://lcp.linguistik.uzh.ch"
+CREATE_URL_TEST = "http://localhost:9090"
 
 VALID_EXTENSIONS = (
     "csv",
@@ -29,6 +27,17 @@ VALID_EXTENSIONS = (
 )
 COMPRESSED_EXTENSIONS = ("zip", "tar", "tar.gz", "tar.xz", "7z")
 MEDIA_EXTENSIONS = ("mp3", "mp4", "wav", "ogg")
+
+POST_SIZE_LIMIT = 5 * 1000000000  # in bytes
+
+
+def post(*args, **kwargs):
+    if "files" in kwargs:
+        size = sum(os.path.getsize(f.name) for f in kwargs["files"].values())
+        assert size < POST_SIZE_LIMIT, ConnectionRefusedError(
+            f"Cannot send more than {POST_SIZE_LIMIT / 1000000}MB in one POST request"
+        )
+    return requests.post(*args, **kwargs)
 
 
 def lcp_upload(
@@ -191,11 +200,12 @@ def lcp_upload(
         this_corpus_projects.append(project)
     jso["projects"] = this_corpus_projects
 
-    print("Sending template...")
+    print("Sending template...", jso)
     url = CREATE_URL if live else CREATE_URL_TEST
     if provided_url:
-        url = provided_url.removesuffix("/") + "/create"
-    resp = requests.post(url, headers=headers, json=jso)  # type: ignore
+        url = provided_url
+    url = url.removesuffix("/") + "/create"
+    resp = post(url, headers=headers, json=jso)  # type: ignore
     data = resp.json()
     ret = check_template_and_send(
         data, headers, jso, corpus, base, filt, live, provided_url=provided_url
@@ -264,10 +274,11 @@ def send_media(
 
     print("Sending media data...")
 
-    url = UPLOAD_URL if live else UPLOAD_URL_TEST
+    url = CREATE_URL if live else CREATE_URL_TEST
     if provided_url:
-        url = provided_url.removesuffix("/") + "/upload"
-    resp = requests.post(url, params=jso, headers=headers, files=files)  # type: ignore
+        url = provided_url
+    url = url.removesuffix("/") + "/upload"
+    resp = post(url, params=jso, headers=headers, files=files)  # type: ignore
 
     time.sleep(2)
 
@@ -298,11 +309,15 @@ def check_template_and_send(
             print(f"{k}: {v}")
         return tuple()
 
+    url = CREATE_URL if live else CREATE_URL_TEST
+    if provided_url:
+        url = provided_url
+
     time.sleep(7)
 
-    print("Checking template validity...")
+    print("Checking template validity...", project)
 
-    fin_data = check_template(data, project, headers)
+    fin_data = check_template(data, project, headers, url)
 
     project = fin_data.get("project")
     if not project:
@@ -333,10 +348,8 @@ def check_template_and_send(
 
     print("Sending data...")
 
-    url = UPLOAD_URL if live else UPLOAD_URL_TEST
-    if provided_url:
-        url = provided_url.removesuffix("/") + "/upload"
-    resp = requests.post(url, params=jso, headers=headers, files=files, verify=False)  # type: ignore
+    upload_url = url.removesuffix("/") + "/upload"
+    resp = post(upload_url, params=jso, headers=headers, files=files, verify=False)  # type: ignore
     print("files", files)
 
     time.sleep(5)
@@ -355,7 +368,7 @@ def check_template_and_send(
             print(f"{k}: {v}")
         print("No target. Aborting.")
         return tuple()
-    new_url = data["target"]
+    new_url = url + data["target"]
     jso["check"] = True
     return new_url, headers, jso
 
@@ -372,7 +385,7 @@ def monitor_upload(new_url: str, headers: dict[str, Any], jso: dict[str, Any]) -
     unit: str = "byte"
 
     while True:
-        resp = requests.post(new_url, headers=headers, params=jso)  # type: ignore
+        resp = post(new_url, headers=headers, params=jso)  # type: ignore
         data = resp.json()
 
         print("monitoring", data)
@@ -428,7 +441,7 @@ def monitor_upload(new_url: str, headers: dict[str, Any], jso: dict[str, Any]) -
 
 
 def check_template(
-    data: dict[str, Any], project: str, headers: dict[str, Any]
+    data: dict[str, Any], project: str, headers: dict[str, Any], url: str = ""
 ) -> dict[str, Any]:
     """
     Poll /schema to find out how template job is going
@@ -445,9 +458,10 @@ def check_template(
 
     while True:
         if not status or not (elapsed * 10 % wait):
-            url = data["target"]
+            url = url.removesuffix("/") + data["target"]
             cparams = {"job": data["job"], "project": project}
-            resp = requests.post(url, params=cparams, headers=headers)  # type: ignore
+            print("within check_template", cparams, url, data)
+            resp = post(url, params=cparams, headers=headers)  # type: ignore
             data = resp.json()
             if data.get("status") != status:
                 print("")

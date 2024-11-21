@@ -7,12 +7,20 @@ from datetime import date
 from pathlib import Path
 
 
-def is_time_anchored(entity: dict, config: dict) -> bool:
-    if entity.get("anchoring", {}).get("time", False):
+def is_anchored(entity: dict, config: dict, anchor: str) -> bool:
+    if entity.get("anchoring", {}).get(anchor, False):
         return True
     if entity.get("contains", "") in config.get("layer", {}):
-        return is_time_anchored(config["layer"][entity["contains"]], config)
+        return is_anchored(config["layer"][entity["contains"]], config, anchor)
     return False
+
+
+def is_char_anchored(entity: dict, config: dict) -> bool:
+    return is_anchored(entity, config, "stream")
+
+
+def is_time_anchored(entity: dict, config: dict) -> bool:
+    return is_anchored(entity, config, "time")
 
 
 def get_ci(d: dict, p: str, default={}):
@@ -23,11 +31,9 @@ def get_ci(d: dict, p: str, default={}):
 
 
 def get_file_from_base(fn: str, files: list[str]) -> str:
-    print("list", files)
-    return next(
-        (f for f in files if Path(f).stem.lower() == fn.lower()),
-        "",
-    )
+    out_fn = next((f for f in files if Path(f).stem.lower() == fn.lower()), None)
+    assert out_fn, FileNotFoundError(f"Could not find a file for {fn}")
+    return out_fn
 
 
 class CustomDict:
@@ -446,7 +452,7 @@ class Table:
                 [
                     (
                         f"{self.quote}{str(x)}{self.quote}"
-                        if self.trigger_character in str(x)
+                        if self.trigger_character in str(x) or self.sep in str(x)
                         else str(x)
                     )
                     for x in row
