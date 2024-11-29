@@ -26,7 +26,8 @@ VALID_EXTENSIONS = (
     "tsv",
 )
 COMPRESSED_EXTENSIONS = ("zip", "tar", "tar.gz", "tar.xz", "7z")
-MEDIA_EXTENSIONS = ("mp3", "mp4", "wav", "ogg")
+AUDIOVIDEO_EXTENSIONS = ("mp3", "mp4", "wav", "ogg")
+IMAGE_EXTENSIONS = ("png", "jpg", "jpeg", "bmp")
 
 POST_SIZE_LIMIT = 5 * 1000000000  # in bytes
 
@@ -217,8 +218,39 @@ def lcp_upload(
 
     status, error = ("finished", "")
     if has_media:
+        media_type = (
+            "video"
+            if "video" in (x.get("mediaType", "") for x in has_media.values())
+            else "audio"
+        )
         status, error = send_media(
-            data, headers, jso, corpus, base, filt, live, provided_url=provided_url
+            data,
+            headers,
+            jso,
+            corpus,
+            base,
+            filt,
+            live,
+            provided_url=provided_url,
+            media_type=media_type,
+        )
+
+    has_images = template_data and any(
+        y.get("type", "") == "image"
+        for x in template_data.get("layer", {}).values()
+        for y in x.get("attributes", {}).values()
+    )
+    if has_images:
+        status, error = send_media(
+            data,
+            headers,
+            jso,
+            corpus,
+            base,
+            filt,
+            live,
+            provided_url=provided_url,
+            media_type="image",
         )
 
     if status != "finished":
@@ -236,6 +268,7 @@ def send_media(
     filt: str | None,
     live: bool,
     provided_url: str = "",
+    media_type: str = "audio",
 ) -> tuple[str, str]:
     """
     Poll /schema to check if schema is done, then send data
@@ -264,15 +297,21 @@ def send_media(
     )
 
     files = {
-        os.path.splitext(p)[0]: open(os.path.join(media_path, p), "rb")
+        # os.path.splitext(p)[0]: open(os.path.join(media_path, p), "rb")
+        p: open(os.path.join(media_path, p), "rb")
         for p in os.listdir(media_path)
     }
-    if filt:
-        files = {
-            k: v for k, v in files.items() if filt in k and k.endswith(MEDIA_EXTENSIONS)
-        }
+    if not filt:
+        filt = ""
+    extensions = IMAGE_EXTENSIONS if media_type == "image" else AUDIOVIDEO_EXTENSIONS
+    files = {
+        k: v for k, v in files.items() if filt in k and k.lower().endswith(extensions)
+    }
+    import pdb
 
-    print("Sending media data...")
+    pdb.set_trace()
+
+    print(f"Sending media ({media_type}) data...")
 
     url = CREATE_URL if live else CREATE_URL_TEST
     if provided_url:
