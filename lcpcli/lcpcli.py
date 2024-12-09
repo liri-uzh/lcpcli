@@ -77,6 +77,12 @@ then `lcpcli -c {output_path} -k $API_KEY -s $API_SECRET -p $PROJECT_NAME --live
                     os.rename(os.path.join(path, f), os.path.join(output_dir, f))
                 elif f.endswith(".json") and not json:
                     shutil.copy(os.path.join(path, f), os.path.join(output_dir, f))
+            if os.path.isdir(os.path.join(path, "media")):
+                os.symlink(
+                    os.path.join(path, "media"),
+                    os.path.join(output_dir, "media"),
+                    target_is_directory=True,
+                )
             self.kwargs["corpus"] = output_dir
 
         if not self.kwargs.get("corpus"):

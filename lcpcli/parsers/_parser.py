@@ -649,10 +649,14 @@ class Parser(abc.ABC):
         self.upload_new_doc(
             current_document, self._tables["document"], doc_name=doc_name
         )
-
         for l, lp in self.config["layer"].items():
             table_key = next(
-                (v for k, v in self.config["firstClass"].items() if k == l), l
+                (
+                    k
+                    for k, v in self.config["firstClass"].items()
+                    if v.lower() == l.lower()
+                ),
+                l,
             ).lower()
             if table_key not in self._tables:
                 continue

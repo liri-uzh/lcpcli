@@ -307,9 +307,6 @@ def send_media(
     files = {
         k: v for k, v in files.items() if filt in k and k.lower().endswith(extensions)
     }
-    import pdb
-
-    pdb.set_trace()
 
     print(f"Sending media ({media_type}) data...")
 
