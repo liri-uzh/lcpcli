@@ -1,0 +1,378 @@
+{
+    "meta": {
+        "name": "Text+Berg-Korpus - Schweizer Alpen-Clubs (SAC)",
+        "author": "Noah Bubenhofer and Martin Volk and Fabienne Leuenberger and Daniel Wüest",
+        "date": "2015",
+        "version": 1,
+        "corpusDescription": "Digitale Edition des Jahrbuch des SAC 1864-1923",
+        "url": "www.textberg.ch/site",
+        "sample_query": "Segment s\n\nNamedEntity@s ne\n\nresults => plain\n    context\n        s\n    entities\n        ne"
+    },
+    "firstClass": {
+        "document": "Book",
+        "segment": "Segment",
+        "token": "Token"
+    },
+    "layer": {
+        "Token": {
+            "abstract": false,
+            "layerType": "unit",
+            "anchoring": {
+                "location": false,
+                "stream": true,
+                "time": false
+            },
+            "attributes": {
+                "form": {
+                    "isGlobal": false,
+                    "type": "text",
+                    "nullable": false
+                },
+                "lemma": {
+                    "isGlobal": false,
+                    "type": "text",
+                    "nullable": true
+                },
+                "xpos": {
+                    "isGlobal": false,
+                    "type": "categorical",
+                    "nullable": false,
+                    "values": [
+                        "D_def",
+                        "$.",
+                        "''",
+                        "RB",
+                        "EX",
+                        "WDT",
+                        "ABR",
+                        "CD",
+                        "VVZ",
+                        "NE",
+                        "NOM",
+                        "PP",
+                        "CON",
+                        ":",
+                        "WP$",
+                        "DT",
+                        "VBZ",
+                        "D_dem",
+                        "PCT_S",
+                        "VHP",
+                        "PRE",
+                        "WRB",
+                        ")",
+                        "POS",
+                        "PON",
+                        "PDT",
+                        "WP",
+                        "NPS",
+                        "ADV",
+                        "C_S",
+                        "PCT_W",
+                        "PP$",
+                        "V",
+                        "VV",
+                        ",",
+                        "VBN",
+                        "VBD",
+                        "VHD",
+                        "VB",
+                        "$",
+                        "ART",
+                        "PRO_rel",
+                        "UH",
+                        "VVD",
+                        "RBS",
+                        "CARD",
+                        "NPR",
+                        "CL_obj",
+                        "VVFIN",
+                        "VHZ",
+                        "IN/that",
+                        "PRO_dem",
+                        "A_ind",
+                        "NUM",
+                        "D_poss",
+                        "SENT",
+                        "TO",
+                        "FW",
+                        "VVG",
+                        "CL_suj",
+                        "JJR",
+                        "VH",
+                        "D_ind",
+                        "ADJA",
+                        "DET:def",
+                        "``",
+                        "NP",
+                        "(",
+                        "D_card",
+                        "VER:geru",
+                        "A_qual",
+                        "VHN",
+                        "NN",
+                        "JJS",
+                        "$,",
+                        "D_part",
+                        "JJ",
+                        "VVP",
+                        "N_C",
+                        "P",
+                        "VBG",
+                        "RBR",
+                        "PRE:det",
+                        "VVN",
+                        "MD",
+                        "CC",
+                        "RP",
+                        "VBP",
+                        "ADJ",
+                        "C_C",
+                        "LS",
+                        "KON",
+                        "APPRART",
+                        "N_P",
+                        "N_card",
+                        "$(",
+                        "IN",
+                        "SYM",
+                        "NNS",
+                        "VHG",
+                        "VER:impe",
+                        "APPR",
+                        "FM",
+                        "TRUNC",
+                        "VER:pres",
+                        "DET:indef",
+                        "ADJD",
+                        "ET",
+                        "PRO",
+                        "PRO_int",
+                        "PDS",
+                        "PRO_ind",
+                        "A_card",
+                        "A_ord",
+                        "XY",
+                        "VER:cpre",
+                        "VVIMP",
+                        "#",
+                        "PRO_card",
+                        "KOKOM",
+                        "PIAT",
+                        "VER:futu",
+                        "VVPP",
+                        "KOUS",
+                        "PRELS",
+                        "VAFIN",
+                        "VER:infi",
+                        "PPER",
+                        "PTKVZ",
+                        "CL_refl",
+                        "PPOSAT",
+                        "ADV_int",
+                        "PTKNEG",
+                        "VMINF",
+                        "VVIZU",
+                        "VVINF",
+                        "KOUI",
+                        "PIS",
+                        "PWAT",
+                        "VMFIN",
+                        "APZR",
+                        "PWAV",
+                        "PTKZU",
+                        "VAINF",
+                        "PAV",
+                        "PTKA",
+                        "VAPP",
+                        "PRF",
+                        "PDAT",
+                        "PWS",
+                        "APPO",
+                        "I",
+                        "",
+                        "VER:ppre",
+                        "A_int",
+                        "PTKANT",
+                        "VER:pper",
+                        "D_int",
+                        "ORD",
+                        "ITJ",
+                        "PRO:indef",
+                        "PRO:rela",
+                        "PRELAT",
+                        "VER:remo",
+                        "PREF",
+                        "VAIMP",
+                        "PPOSS",
+                        "VER:cimp",
+                        "PRO:refl",
+                        "PRO_poss",
+                        "VER:impf",
+                        "VER:cond",
+                        "PRO:inter",
+                        "PRO:demo",
+                        "ADV_excl",
+                        "PRO:poss",
+                        "PRO:pers",
+                        "INT",
+                        "D_excl",
+                        "VMPP",
+                        "V_",
+                        "VER:refl:infi"
+                    ]
+                },
+                "misc": {
+                    "type": "dict",
+                    "isGlobal": false,
+                    "nullable": true
+                }
+            }
+        },
+        "NamedEntity": {
+            "abstract": false,
+            "layerType": "span",
+            "contains": "Token",
+            "attributes": {
+                "firstname": {
+                    "type": "text",
+                    "nullable": true
+                },
+                "lastname": {
+                    "type": "text",
+                    "nullable": true
+                },
+                "gender": {
+                    "type": "categorical",
+                    "nullable": true,
+                    "values": [
+                        "",
+                        "F",
+                        "M"
+                    ]
+                },
+                "stid": {
+                    "type": "text",
+                    "nullable": true
+                },
+                "type": {
+                    "type": "categorical",
+                    "nullable": true,
+                    "values": [
+                        "mountain",
+                        "mountain cabin",
+                        "glacier",
+                        "lake",
+                        "valley",
+                        "city",
+                        "person"
+                    ]
+                }
+            }
+        },
+        "Segment": {
+            "abstract": false,
+            "layerType": "span",
+            "contains": "Token",
+            "attributes": {
+                "meta": {
+                    "sent_id": {
+                        "type": "text",
+                        "nullable": false
+                    }
+                }
+            }
+        },
+        "Article": {
+            "abstract": false,
+            "contains": "Segment",
+            "layerType": "span",
+            "attributes": {
+                "lang": {
+                    "type": "categorical",
+                    "values": [
+                        "ch-de",
+                        "en",
+                        "it",
+                        "de",
+                        "fr",
+                        "rm"
+                    ]
+                },
+                "orig_lang": {
+                    "type": "categorical",
+                    "values": [
+                        "",
+                        "en",
+                        "it",
+                        "de",
+                        "fr"
+                    ]
+                },
+                "meta": {
+                    "author": {
+                        "type": "text",
+                        "nullable": true
+                    },
+                    "author_city": {
+                        "type": "text",
+                        "nullable": true
+                    },
+                    "author_description": {
+                        "type": "text",
+                        "nullable": true
+                    },
+                    "author_id": {
+                        "type": "text",
+                        "nullable": true
+                    },
+                    "category": {
+                        "type": "text",
+                        "nullable": true
+                    },
+                    "duplicate_of": {
+                        "type": "text",
+                        "nullable": true
+                    },
+                    "id": {
+                        "type": "text",
+                        "nullable": true
+                    },
+                    "month": {
+                        "type": "text",
+                        "nullable": true
+                    },
+                    "title": {
+                        "type": "text",
+                        "nullable": true
+                    },
+                    "translation": {
+                        "type": "text",
+                        "nullable": true
+                    }
+                }
+            }
+        },
+        "Book": {
+            "abstract": false,
+            "contains": "Article",
+            "layerType": "span",
+            "attributes": {
+                "meta": {
+                    "name": {
+                        "type": "text",
+                        "nullable": false
+                    },
+                    "languages": {
+                        "type": "categorical",
+                        "nullable": true
+                    },
+                    "year": {
+                        "type": "number",
+                        "nullable": false
+                    }
+                }
+            }
+        }
+    }
+}

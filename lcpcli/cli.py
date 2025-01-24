@@ -93,8 +93,8 @@ def _parse_cmd_line():
         **BOOL_KWARGS,
     )
     parser.add_argument(
-        "-t",
-        "--to",
+        "-r",
+        "--url",
         type=str,
         required=False,
         help="URL of the LCP instance receiving the corpus.",
@@ -111,4 +111,5 @@ def _parse_cmd_line():
     kwargs = vars(parser.parse_args())
     kwargs["content"] = kwargs.pop("input", "")
     kwargs["template"] = kwargs.pop("json", False)
+    kwargs["provided_url"] = kwargs.pop("url", "")
     return kwargs

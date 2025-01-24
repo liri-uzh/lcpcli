@@ -4,14 +4,23 @@ import re
 import uuid
 
 from datetime import date
+from pathlib import Path
+
+
+def is_anchored(entity: dict, config: dict, anchor: str) -> bool:
+    if entity.get("anchoring", {}).get(anchor, False):
+        return True
+    if entity.get("contains", "") in config.get("layer", {}):
+        return is_anchored(config["layer"][entity["contains"]], config, anchor)
+    return False
+
+
+def is_char_anchored(entity: dict, config: dict) -> bool:
+    return is_anchored(entity, config, "stream")
 
 
 def is_time_anchored(entity: dict, config: dict) -> bool:
-    if entity.get("anchoring", {}).get("time", False):
-        return True
-    if entity.get("contains", "") in config.get("layer", {}):
-        return is_time_anchored(config["layer"][entity["contains"]], config)
-    return False
+    return is_anchored(entity, config, "time")
 
 
 def get_ci(d: dict, p: str, default={}):
@@ -19,6 +28,12 @@ def get_ci(d: dict, p: str, default={}):
     Case-insensitive get on an object
     """
     return next((v for n, v in d.items() if n.lower() == p.lower()), default)
+
+
+def get_file_from_base(fn: str, files: list[str]) -> str:
+    out_fn = next((f for f in files if Path(f).stem.lower() == fn.lower()), None)
+    assert out_fn, FileNotFoundError(f"Could not find a file for {fn}")
+    return out_fn
 
 
 class CustomDict:
@@ -412,12 +427,15 @@ class Table:
     def __init__(self, name, path, config={}):
         self.name = name
         self.path = os.path.join(path, f"{name}.csv")
-        self.file = open(self.path, "a")
+        assert not os.path.exists(self.path), FileExistsError(
+            f"Output file '{self.path}' already exists."
+        )
+        self.file = open(self.path, "w")
         self.config = config
         self.cursor = 1
         self.current_entity = dict()
         self.previous_entity = None
-        self.colNames = ([],)
+        self.col_names = []
         self.labels = dict()
         self.texts = dict()
         self.deps = dict()
@@ -426,6 +444,7 @@ class Table:
         self.quote = f"\b"
         self.trigger_character = "'"
         self.categorical_values: dict[str, set] = {}
+        self.aligned_cols: dict[str, list[str]] = dict()  # {fk: [cols]}
 
     def write(self, row: list):
         self.file.write(
@@ -433,7 +452,7 @@ class Table:
                 [
                     (
                         f"{self.quote}{str(x)}{self.quote}"
-                        if self.trigger_character in str(x)
+                        if self.trigger_character in str(x) or self.sep in str(x)
                         else str(x)
                     )
                     for x in row

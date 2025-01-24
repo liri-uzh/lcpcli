@@ -3,13 +3,23 @@ import json
 import os
 import shutil
 
+from pandas import read_csv, isna
+from time import time
+
 from .parsers.conllu import CONLLUParser
 from .parsers.vert import VERTParser
 from .parsers.tei import TEIParser
 from .parsers.json import JSONParser
 
 from .cli import _parse_cmd_line
-from .utils import default_json
+from .utils import (
+    default_json,
+    get_file_from_base,
+    is_char_anchored,
+    is_time_anchored,
+    LookupTable,
+    Sentence,
+)
 
 from jsonschema import validate
 from pathlib import Path
@@ -93,10 +103,12 @@ class Corpert:
         if os.path.isfile(content):
             self._input_files.append(content)
         elif os.path.isdir(content):
-            for root, dirs, files in os.walk(content):
-                for file in files:
-                    fullpath = os.path.join(root, file)
-                    self._input_files.append(fullpath)
+            # for root, dirs, files in os.walk(content):
+            for file in os.listdir(content):
+                # for file in files:
+                # fullpath = os.path.join(root, file)
+                fullpath = os.path.join(content, file)
+                self._input_files.append(fullpath)
         elif isinstance(content, str):
             self._input_files.append(content)
             self._on_disk = False
@@ -108,6 +120,155 @@ class Corpert:
         Just allows us to do Corpert(**kwargs)()
         """
         return self.run(*args, **kwargs)
+
+    def _preprocess_labels(self, config, files):
+        labels = dict()  # {layer: {attribute: {label1: None, label2: None, ...}}}
+        output_path = self.output or "."
+        for layer_name, layer_attrs in config["layer"].items():
+            lname = layer_name.lower()
+            if lname in {x.lower() for x in config["firstClass"].values()}:
+                continue
+            for attr_name, attr_values in layer_attrs.get("attributes", {}).items():
+                if attr_values.get("type") != "labels":
+                    continue
+                aname = attr_name.lower()
+                layer_file = get_file_from_base(layer_name, files)
+                if not layer_file:
+                    print(
+                        f"Warning: {layer_name}->{attr_name} is of type labels but no file could be found for {layer_name}"
+                    )
+                    continue
+                layer_attr_labels = {}
+                with open(layer_file, "r") as input:
+                    found_comma = False
+                    headers = []
+                    while line := input.readline():
+                        cells = [c.strip() for c in line.split("\t")]
+                        if not headers:
+                            headers = cells
+                            if aname not in [c.lower() for c in cells]:
+                                print(
+                                    f"Warning: could not find a column named {attr_name} in {layer_file}"
+                                )
+                                break
+                            continue
+                        unsplit_labels = next(
+                            cells[n]
+                            for n, h in enumerate(headers)
+                            if h.lower() == aname
+                        )
+                        found_comma = found_comma or ("," in unsplit_labels)
+                        split_labels = {
+                            l.strip(): True for l in unsplit_labels.split(",")
+                        }
+                        layer_attr_labels.update(split_labels)
+                if not found_comma:
+                    print(
+                        f"Warning: no comma found in any of the labels, did you forget to separate your labels with commas?"
+                    )
+                if layer_attr_labels:
+                    labels[layer_name] = labels.get(layer_name, {})
+                    labels[layer_name][attr_name] = layer_attr_labels
+                    # output_fn = os.path.join(output_path, f"{lname}_{aname}.csv")
+                    output_fn = os.path.join(output_path, f"{lname}_labels.csv")
+                    if os.path.exists(output_fn):
+                        print(
+                            f"Warning: file {output_fn} already exists -- overwriting it"
+                        )
+                    with open(output_fn, "w") as output:
+                        output.write("\t".join(["bit", "label"]))
+                        for n, lab in enumerate(layer_attr_labels):
+                            output.write("\n" + "\t".join([str(n), lab]))
+        return labels
+
+    def _prepare_aligned_entity_dict(
+        self, filename, layer_name, config, labels
+    ) -> tuple[dict[str, list[str]], list[str]]:
+        """
+        Read the table file corresponding to the aligned entity
+        and return prepared rows + column names
+        """
+        print(f"Processing {filename}...")
+        ret: dict[str, list[str]] = dict()
+        ae_col_names: list[str] = []
+        lname: str = layer_name.lower()
+        layer_config: dict = config["layer"].get(layer_name, {})
+        layer_attributes: dict = layer_config.get("attributes", {})
+        output_path: str = self.output or "."
+        lookup_tables: dict[str, LookupTable] = {}
+        categorical_values: dict[str, set[str]] = {}
+
+        file_content = read_csv(filename, sep="\t")
+        # Prepare the column names
+        #   ae_col_names are the columns in the (future) output file
+        #   col_names are the columns (minus ID) from the input file
+        ae_col_names = [f"{lname}_id"]
+        col_names = [c.strip() for c in file_content.columns]
+        for n, cn in enumerate(col_names):
+            if n == 0:
+                continue
+            attribute_props = layer_attributes.get(cn, None)
+            assert attribute_props is not None, ReferenceError(
+                f"Attribute {cn} not found for entity {layer_name}"
+            )
+            col_name = cn.lower()
+            if attribute_props.get("type", "") == "text":
+                ae_col_names.append(col_name + "_id")
+                lookup_tables[col_name] = LookupTable(
+                    lname, col_name, output_path, config
+                )
+            else:
+                ae_col_names.append(col_name)
+        if is_char_anchored(layer_config, config):
+            ae_col_names.append("char_range")
+        if is_time_anchored(layer_config, config):
+            ae_col_names.append("frame_range")
+
+        # Process the rows
+        for _, cols in file_content.iterrows():
+            prepared_cols = []
+            id = ""
+            for n, col_name in enumerate(col_names):
+                col: str = "" if isna(cols[col_name]) else str(cols[col_name])
+                if n == 0:
+                    id = col
+                    continue
+                attr_name = next(
+                    (
+                        x
+                        for x in layer_attributes
+                        if x.lower() == col_name or x.lower() + "_id" == col_name
+                    ),
+                    col_name,
+                )
+                ctype = layer_attributes.get(attr_name, {}).get("type")
+                if ctype == "text":
+                    # Create a lookup table if it doesn't exist
+                    lookup_table: LookupTable = lookup_tables[col_name]
+                    col = lookup_table.get_id(col)
+                elif ctype == "labels":
+                    current_labels = {l.strip() for l in col.split(",")}
+                    attr_labels = labels.get(layer_name, {}).get(attr_name, {})
+                    indices = {
+                        n for n, lab in enumerate(attr_labels) if lab in current_labels
+                    }
+                    bits = [int(n in indices) for n in range(len(attr_labels))]
+                    col = "".join([str(b) for b in bits])
+                elif ctype == "categorical":
+                    if col_name not in categorical_values:
+                        categorical_values[col_name] = set()
+                    categorical_values[col_name].add(col)
+
+                prepared_cols.append(col)
+
+            ret[id] = prepared_cols
+
+        # List the categorical values in the config
+        for cn, cv in categorical_values.items():
+            config["layer"][layer_name]["attributes"][cn]["values"] = [
+                Sentence._esc(v) for v in cv
+            ]
+        return (ret, ae_col_names)
 
     def _detect_format_from_string(self, content):
         """
@@ -201,6 +362,8 @@ class Corpert:
         # sents = []
         # docs = []
 
+        self.mode = "upload"  # only support upload mode for now
+
         if self.mode == "upload":
             ignore_files = set()
             json_obj = None
@@ -226,9 +389,16 @@ class Corpert:
                 validate(json_obj, json.loads(schema_file.read()))
                 print("validated json schema")
 
+            output_path = self.output or "."
+
             aligned_entities = {}
             aligned_entities_segment = {}
             firstClass = json_obj.get("firstClass", {})
+            for l in firstClass.values():
+                assert l in json_obj.get("layer", {}), ReferenceError(
+                    f"'{l}' is declared in 'firstClass' but could not be found in 'layer'."
+                )
+
             token_is_char_anchored = (
                 json_obj.get("layer", {})
                 .get(firstClass["token"], {})
@@ -242,20 +412,28 @@ class Corpert:
                     or layer in firstClass.values()
                 ):
                     continue
-                fn = f"{layer.lower()}.csv"
-                assert os.path.exists(os.path.join(self._path, fn)), FileNotFoundError(
+                fn = get_file_from_base(layer, os.listdir(self._path))
+                fpath = os.path.join(self._path, fn)
+                assert os.path.exists(fpath), FileNotFoundError(
                     f"Could not find a file named '{fn}' in {self._path} for time-anchored layer '{layer}'"
                 )
-                ignore_files.add(fn)
+                ignore_files.add(fpath)
             # Detect the global attributes files and exclude them from the list of files to process
             for glob_attr in json_obj.get("globalAttributes", {}):
-                filename = f"global_attribute_{glob_attr}.csv"
+                stem_name = f"global_attribute_{glob_attr}"
+                filename = get_file_from_base(stem_name, os.listdir(self._path))
                 source = os.path.join(self._path, filename)
                 ignore_files.add(source)
                 assert os.path.exists(source), FileExistsError(
                     f"No file named '{filename}' found for global attribute '{glob_attr}'"
                 )
-                shutil.copy(source, os.path.join(self.output or "./", filename))
+                shutil.copy(source, os.path.join(output_path, filename))
+
+            labels = self._preprocess_labels(json_obj, self._input_files)
+            for layer_name, attributes in labels.items():
+                for attribute_name, attribute_labels in attributes.items():
+                    json_obj["layer"][layer_name]["nlabels"] = len(attribute_labels)
+
             # Process the input files that are not at the token, segment or document level
             for layer, properties in json_obj.get("layer", {}).items():
                 if layer in firstClass.values():
@@ -269,66 +447,90 @@ class Corpert:
                     not in (firstClass["token"], firstClass["segment"])
                 ):
                     continue
-                layerFile = next(
-                    (
-                        f
-                        for f in self._input_files
-                        if Path(f).stem.lower() == layer.lower()
-                    ),
-                    "",
+                layer_file = os.path.join(
+                    self._path, get_file_from_base(layer, os.listdir(self._path))
                 )
-                assert layerFile, FileExistsError(
+                assert layer_file, FileExistsError(
                     f"Could not find a reference file for entity type '{layer}'"
                 )
-                ignore_files.add(layerFile)
-                with open(layerFile, "r") as f:
+                ignore_files.add(layer_file)
+                with open(layer_file, "r") as f:
                     cols = [x.lower() for x in f.readline().split()]
                     for a in properties.get("attributes", {}):
                         assert a.lower() in cols, ReferenceError(
-                            f"No column found for attribute '{a}' in {layerFile}"
+                            f"No column found for attribute '{a}' in {layer_file}"
                         )
                 if properties["contains"] == firstClass["token"]:
+                    ae_table, ae_col_names = self._prepare_aligned_entity_dict(
+                        layer_file, layer, json_obj, labels
+                    )
                     aligned_entities[layer.lower()] = {
-                        "fn": layerFile,
+                        "fn": layer_file,
                         "properties": properties,
+                        "refs": ae_table,
+                        "col_names": ae_col_names,
                     }
                 else:
+                    aes_table, aes_col_names = self._prepare_aligned_entity_dict(
+                        layer_file, layer, json_obj, labels
+                    )
                     aligned_entities_segment[layer.lower()] = {
-                        "fn": layerFile,
+                        "fn": layer_file,
                         "properties": properties,
+                        "refs": aes_table,
+                        "col_names": aes_col_names,
                     }
             parser = None
             # Process the remaining input files
-            for filepath in self._input_files:
-                if filepath in ignore_files:
-                    continue
-                fn_before_ext = Path(filepath).stem
-                if fn_before_ext.lower() in {
-                    k.lower() for k in json_obj.get("layer", {})
-                }:
-                    continue
-                print("input file", filepath)
-                if not os.path.isfile(filepath):
-                    print(f"Not a file: ignoring '{filepath}'")
-                    continue
-                if os.path.basename(filepath) == "meta.json":
-                    continue
+            doc_files = [
+                f
+                for f in self._input_files
+                if (
+                    os.path.isfile(f)
+                    and f not in ignore_files
+                    and os.path.basename(f) != "meta.json"
+                    # discard files named like layer names
+                    and Path(f).stem.lower()
+                    not in {k.lower() for k in json_obj.get("layer", {})}
+                )
+            ]
+            nfiles = len(doc_files)
+            start_time_input_files = time()
+            for nfile, filepath in enumerate(doc_files, start=1):
+                elapsed_time = time() - start_time_input_files
+                print(
+                    "input file",
+                    filepath,
+                    f" ({nfile}/{nfiles}; elapsed {round(elapsed_time, 2)}s;",
+                    f"remaining {round((elapsed_time / nfile) * (nfiles - nfile))}s)",
+                )
                 parser = parser or PARSERS[self._determine_format(filepath)](
-                    config=json_obj
+                    config=json_obj, labels=labels
                 )
                 print(filepath)
-                with open(filepath, "r") as f:
-                    parser.generate_upload_files_generator(
-                        f,
-                        path=self.output or "./",
-                        default_doc={"name": os.path.basename(filepath)},
-                        config=json_obj,
-                        aligned_entities=aligned_entities,
-                        aligned_entities_segment=aligned_entities_segment,
-                    )
-            parser.close_upload_files(
-                path=self.output or "./",
-            )
+                try:
+                    # First pass: check that the file has some content
+                    with open(filepath, "r") as f:
+                        has_content = False
+                        while line := f.readline():
+                            line = line.strip()
+                            if line.startswith("#") or not line:
+                                continue
+                            has_content = True
+                            break
+                        assert has_content, AssertionError("No conllu lines to process")
+                    with open(filepath, "r") as f:
+                        parser.generate_upload_files_generator(
+                            f,
+                            path=output_path,
+                            default_doc={"name": os.path.basename(filepath)},
+                            config=json_obj,
+                            aligned_entities=aligned_entities,
+                            aligned_entities_segment=aligned_entities_segment,
+                        )
+                except Exception as err:
+                    print("Could not process", filepath, ": ", err)
+            parser.close_upload_files(path=output_path)
             # Process time-anchored extra layers
             for layer, properties in json_obj.get("layer", {}).items():
                 if (
@@ -336,16 +538,20 @@ class Corpert:
                     or layer in firstClass.values()
                 ):
                     continue
-                fn = f"{layer.lower()}.csv"
+                fn = get_file_from_base(layer, os.listdir(self._path))
                 attributes = properties.get("attributes", {})
-                output_path = self.output or "./"
                 input_col_names = []
                 doc_id_idx = 0
                 start_idx = 0
                 end_idx = 0
-                with open(os.path.join(self._path, fn), "r") as input_file, open(
-                    os.path.join(output_path, fn), "w"
-                ) as output_file:
+                output_fn = os.path.join(output_path, fn)
+                assert not os.path.exists(output_fn), FileExistsError(
+                    f"The output file '{output_fn}' already exists."
+                )
+                with (
+                    open(os.path.join(self._path, fn), "r") as input_file,
+                    open(output_fn, "w") as output_file,
+                ):
                     while input_line := input_file.readline():
                         input_cols = input_line.rstrip("\n").split("\t")
                         output_cols = []
@@ -406,9 +612,9 @@ class Corpert:
 
             print(f"outfiles written to '{self._path}'.")
             json_str = json.dumps(json_obj, indent=4)
-            json_path = os.path.join(self.output or ".", "meta.json")
+            json_path = os.path.join(output_path, "meta.json")
             open(json_path, "w").write(json_str)
-            print(f"\n{json_str}\n")
+            # print(f"\n{json_str}\n")
             print(
                 f"A default meta.json file with the structure above was automatically generated at '{json_path}' for the current corpus."
             )
