@@ -398,7 +398,7 @@ class Parser(abc.ABC):
                             doc_name=doc_name,
                         )
                     current_document = doc
-                    current_document.frame_range[0] = offset_frame_range
+                    current_document.frame_range[0] = self.frame_range_cur
                     current_document.char_range_start = char_range_segment_start
 
             if not segment:
