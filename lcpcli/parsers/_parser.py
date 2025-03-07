@@ -422,7 +422,10 @@ class Parser(abc.ABC):
                         ):
                             continue
                         # Attributes of type Text and Meta use foreign keys
-                        if any(isinstance(attr_value, klass) for klass in (Text, Meta)):
+                        if any(
+                            isinstance(attr_value, klass) and attr_name != "meta"
+                            for klass in (Text, Meta)
+                        ):
                             col_names[attr_name + "_id"] = None
                         else:
                             col_names[attr_name] = None
@@ -452,6 +455,9 @@ class Parser(abc.ABC):
                     # For example, named_entity
                     if aname_low in aligned_entities and isinstance(attribute, Text):
                         self.aligned_entity(token, path, attribute, aligned_entities)
+
+                    elif aname_low == "meta":
+                        cols.append(str(attribute.value))
 
                     # For example, xpos
                     elif isinstance(attribute, Categorical):

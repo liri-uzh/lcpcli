@@ -87,6 +87,7 @@ class CONLLUParser(Parser):
         token_from_config = config.get("layer", {}).get(
             config.get("firstClass", {}).get("token"), {}
         )
+        token_conf_attributes = token_from_config.get("attributes", {})
         current_sentence: dict = {"meta": {}, "text": []}
         mediaSlots = self.config.get("meta", {}).get("mediaSlots", {})
         for line in sentence_lines:
@@ -180,11 +181,11 @@ class CONLLUParser(Parser):
                                 )
                             else:
                                 misc[pk] = str(pv)
-                        token.attributes["misc"] = Meta("misc", misc)
-                    elif (
-                        token_from_config.get("attributes", {}).get(k, {}).get("type")
-                        == "categorical"
-                    ):
+                        attname = (
+                            "meta" if "misc" not in token_conf_attributes else "misc"
+                        )
+                        token.attributes[attname] = Meta(attname, misc)
+                    elif token_conf_attributes.get(k, {}).get("type") == "categorical":
                         token.attributes[k] = Categorical(k, v.rstrip())
                     else:
                         token.attributes[k] = Text(k, v)
