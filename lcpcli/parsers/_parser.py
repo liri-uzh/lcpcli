@@ -404,17 +404,27 @@ class Parser(abc.ABC):
             if not segment:
                 continue
 
-            # List only the token attributes that are not null on every row
-            non_null_attributes = token_table.non_null_attributes
-            if not non_null_attributes and token_table.cursor == 1:
+            # List only the token attributes that contain at least one non-null row
+            real_attributes = token_table.real_attributes
+            if not real_attributes and token_table.cursor == 1:
                 col_names = {f"{tok_name}_id": None}
+                tok_attrs_from_conf = (
+                    self.config["layer"]
+                    .get(config["firstClass"].get("token", tok_name), {})
+                    .get("attributes", {})
+                )
                 for token in segment.tokens:
                     if token.frame_range:
                         has_frame_range = True
                     for attr_name, attr_value in token.attributes.items():
-                        if not attr_value.value:
+                        if attr_name in real_attributes:
                             continue
-                        non_null_attributes[attr_name] = True
+                        if (
+                            not attr_value.value
+                            and attr_name not in tok_attrs_from_conf
+                        ):
+                            continue
+                        real_attributes[attr_name] = True
                         # Dependencies and references to aligned entities will be processed separately; do not list
                         if (
                             isinstance(attr_value, Dependency)
@@ -429,7 +439,7 @@ class Parser(abc.ABC):
                             col_names[attr_name + "_id"] = None
                         else:
                             col_names[attr_name] = None
-                token_table.non_null_attributes = non_null_attributes
+                token_table.real_attributes = real_attributes
                 col_names["char_range"] = None
                 if has_frame_range:
                     col_names["frame_range"] = None
@@ -444,7 +454,7 @@ class Parser(abc.ABC):
             # )
             for token in segment.tokens:
                 cols = [str(token_table.cursor)]
-                for attr_name in non_null_attributes:
+                for attr_name in real_attributes:
                     attribute = token.attributes.get(attr_name, None)
                     aname_low = attr_name.lower()
 
@@ -523,7 +533,7 @@ class Parser(abc.ABC):
 
                 # If this token doesn't have an attribute for an aligned entity, close any pending one
                 for aligned_entity in aligned_entities:
-                    if aligned_entity in [a.lower() for a in non_null_attributes]:
+                    if aligned_entity in [a.lower() for a in real_attributes]:
                         continue
                     self.close_aligned_entity(aligned_entity, path, aligned_entities)
 
@@ -534,7 +544,7 @@ class Parser(abc.ABC):
                 cols.append(f"[{str(left_char_range)},{str(self.char_range_cur)})")
                 self.char_range_cur += 1
                 if token.frame_range:
-                    has_frame_range = True  # Keep it here too for iterations where non_null_attributes is already set
+                    has_frame_range = True  # Keep it here too for iterations where real_attributes is already set
                     left_frame_range, right_frame_range = token.frame_range
                     left_frame_range += offset_frame_range
                     right_frame_range += offset_frame_range
@@ -609,7 +619,7 @@ class Parser(abc.ABC):
                 vector = []
                 for n, token in enumerate(segment.tokens, start=1):
                     attributes_to_fts = []
-                    for an in non_null_attributes:
+                    for an in real_attributes:
                         a = token.attributes[an]
                         if (
                             any(isinstance(a, k) for k in (Categorical, Text))

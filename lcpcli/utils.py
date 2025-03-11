@@ -465,7 +465,7 @@ class Table:
 class TokenTable(Table):
     def __init__(self, name, path, config={}):
         super().__init__(name, path, config)
-        self.non_null_attributes = {}
+        self.real_attributes = {}
 
 
 class LookupTable(Table):
@@ -503,7 +503,7 @@ class Meta(Attribute):
     @property
     def value(self):
         if not self._value:
-            return ""
+            return "{}"
         else:
             return json.dumps(self._value)
 

@@ -2,6 +2,7 @@ import codecs
 import json
 import os
 import shutil
+import traceback
 
 from pandas import read_csv, isna
 from time import time
@@ -530,6 +531,7 @@ class Corpert:
                         )
                 except Exception as err:
                     print("Could not process", filepath, ": ", err)
+                    traceback.print_exc()
             parser.close_upload_files(path=output_path)
             # Process time-anchored extra layers
             for layer, properties in json_obj.get("layer", {}).items():

@@ -166,13 +166,14 @@ class CONLLUParser(Parser):
                         k == "misc"
                         or token_conf_attributes.get(k, {}).get("type") == "dict"
                     ):
-                        if not v or "=" not in v:
-                            continue
+                        # if not v or "=" not in v:
+                        #     continue
                         kv_obj = {}
-                        for pkpv in v.split("|"):
+                        for pkpv in (v or "").split("|"):
                             if "=" not in pkpv:
                                 continue
-                            pk, pv = pkpv.split("=")
+                            pk, *pv = pkpv.split("=")
+                            pv = "=".join(pv)
                             pk = pk.strip()
                             if k != "misc":
                                 kv_obj[pk] = str(pv)
