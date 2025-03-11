@@ -189,7 +189,7 @@ class Sentence:
 
     @staticmethod
     def _esc(string):
-        return string.replace("'", "''").replace("\\", "\\\\")
+        return string.replace("'", "''").replace("\\", "\\\\").replace("\\n", "")
 
     def __init__(self, lines, parser):
         self._comments = [l for l in lines if l.startswith("# ")]

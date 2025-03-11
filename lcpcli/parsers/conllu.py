@@ -162,15 +162,21 @@ class CONLLUParser(Parser):
                         )
                         dep.label = v
                         token.attributes["head"] = dep
-                    elif k == "misc":
+                    elif (
+                        k == "misc"
+                        or token_conf_attributes.get(k, {}).get("type") == "dict"
+                    ):
                         if not v or "=" not in v:
                             continue
-                        misc = {}
+                        kv_obj = {}
                         for pkpv in v.split("|"):
                             if "=" not in pkpv:
                                 continue
                             pk, pv = pkpv.split("=")
                             pk = pk.strip()
+                            if k != "misc":
+                                kv_obj[pk] = str(pv)
+                                continue
                             if pk == "SpaceAfter":
                                 continue
                             pv = pv.strip()
@@ -180,11 +186,15 @@ class CONLLUParser(Parser):
                                     25.0 * float(pv)
                                 )
                             else:
-                                misc[pk] = str(pv)
-                        attname = (
-                            "meta" if "misc" not in token_conf_attributes else "misc"
-                        )
-                        token.attributes[attname] = Meta(attname, misc)
+                                kv_obj[pk] = str(pv)
+                        attname = k.lower()
+                        if k == "misc":
+                            attname = (
+                                "meta"
+                                if "misc" not in token_conf_attributes
+                                else "misc"
+                            )
+                        token.attributes[attname] = Meta(attname, kv_obj)
                     elif token_conf_attributes.get(k, {}).get("type") == "categorical":
                         token.attributes[k] = Categorical(k, v.rstrip())
                     else:
