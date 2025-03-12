@@ -428,6 +428,7 @@ class Corpert:
                 assert os.path.exists(source), FileExistsError(
                     f"No file named '{filename}' found for global attribute '{glob_attr}'"
                 )
+                os.makedirs(output_path, exist_ok=True) # create the output directory if it doesn't exist
                 shutil.copy(source, os.path.join(output_path, filename))
 
             labels = self._preprocess_labels(json_obj, self._input_files)
@@ -612,7 +613,7 @@ class Corpert:
                             output_cols.append(f"[{start},{end})")
                         output_file.write("\t".join(output_cols) + "\n")
 
-            print(f"outfiles written to '{self._path}'.")
+            print(f"outfiles written to '{self.output}'.")
             json_str = json.dumps(json_obj, indent=4)
             json_path = os.path.join(output_path, "meta.json")
             open(json_path, "w").write(json_str)
