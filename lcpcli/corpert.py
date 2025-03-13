@@ -391,6 +391,7 @@ class Corpert:
                 print("validated json schema")
 
             output_path = self.output or "."
+            os.makedirs(output_path, exist_ok=True) # create the output directory if it doesn't exist
 
             aligned_entities = {}
             aligned_entities_segment = {}
@@ -428,7 +429,6 @@ class Corpert:
                 assert os.path.exists(source), FileExistsError(
                     f"No file named '{filename}' found for global attribute '{glob_attr}'"
                 )
-                os.makedirs(output_path, exist_ok=True) # create the output directory if it doesn't exist
                 shutil.copy(source, os.path.join(output_path, filename))
 
             labels = self._preprocess_labels(json_obj, self._input_files)
