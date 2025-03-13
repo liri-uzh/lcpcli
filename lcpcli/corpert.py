@@ -391,6 +391,7 @@ class Corpert:
                 print("validated json schema")
 
             output_path = self.output or "."
+            os.makedirs(output_path, exist_ok=True) # create the output directory if it doesn't exist
 
             aligned_entities = {}
             aligned_entities_segment = {}
@@ -612,7 +613,7 @@ class Corpert:
                             output_cols.append(f"[{start},{end})")
                         output_file.write("\t".join(output_cols) + "\n")
 
-            print(f"outfiles written to '{self._path}'.")
+            print(f"outfiles written to '{self.output}'.")
             json_str = json.dumps(json_obj, indent=4)
             json_path = os.path.join(output_path, "meta.json")
             open(json_path, "w").write(json_str)
