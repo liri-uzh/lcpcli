@@ -176,7 +176,7 @@ class CONLLUParser(Parser):
                             pv = "=".join(pv)
                             pk = pk.strip()
                             if k != "misc":
-                                kv_obj[pk] = str(pv)
+                                kv_obj[pk] = str(pv).strip()
                                 continue
                             if pk == "SpaceAfter":
                                 continue
