@@ -78,6 +78,27 @@ def _parse_cmd_line():
         help="Project the corpus will be uploaded into",
     )
     parser.add_argument(
+        "-d",
+        "--delimiter",
+        type=str,
+        required=False,
+        help="The character used to separate the columns in the uploaded files (default is comma ,)",
+    )
+    parser.add_argument(
+        "-q",
+        "--quote",
+        type=str,
+        required=False,
+        help='The character used to surround the values of the columns in the uploaded files (default is double-quotes ")',
+    )
+    parser.add_argument(
+        "-a",
+        "--escape",
+        type=str,
+        required=False,
+        help="The character used to escape a character in the uploaded files (default is backslash \)",
+    )
+    parser.add_argument(
         "-j",
         "--json",
         type=str,

@@ -404,7 +404,8 @@ class Parser(abc.ABC):
             if not segment:
                 continue
 
-            # List only the token attributes that contain at least one non-null row
+            # If no meta.json file was provided, we try to be smart about which attributes to keep
+            # otherwise we simply keep all the attributes that are listed there
             real_attributes = token_table.real_attributes
             if not real_attributes and token_table.cursor == 1:
                 col_names = {f"{tok_name}_id": None}

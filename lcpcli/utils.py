@@ -36,6 +36,16 @@ def get_file_from_base(fn: str, files: list[str]) -> str:
     return out_fn
 
 
+def esc(value: str | int, quote: str = '"', double: bool = True) -> str:
+    return (
+        str(value)
+        .replace("'", "''" if double else "'")
+        .replace("\\", "\\\\")
+        .replace("\\n", "")
+        .replace(quote, "\\" + quote)
+    )
+
+
 class CustomDict:
     def __init__(self, is_ufeat=False):
         self._dictionary = {}
@@ -189,7 +199,7 @@ class Sentence:
 
     @staticmethod
     def _esc(string):
-        return string.replace("'", "''").replace("\\", "\\\\").replace("\\n", "")
+        return esc(string)
 
     def __init__(self, lines, parser):
         self._comments = [l for l in lines if l.startswith("# ")]
@@ -440,8 +450,8 @@ class Table:
         self.texts = dict()
         self.deps = dict()
         self.anchor_right = 0
-        self.sep = "\t"
-        self.quote = f"\b"
+        self.sep = ","
+        self.quote = '"'
         self.trigger_character = "'"
         self.categorical_values: dict[str, set] = {}
         self.aligned_cols: dict[str, list[str]] = dict()  # {fk: [cols]}
@@ -451,8 +461,10 @@ class Table:
             self.sep.join(
                 [
                     (
-                        f"{self.quote}{str(x)}{self.quote}"
-                        if self.trigger_character in str(x) or self.sep in str(x)
+                        f"{self.quote}{esc(x, self.quote, double=False)}{self.quote}"
+                        if self.trigger_character in str(x)
+                        or self.sep in str(x)
+                        or self.quote in str(x)
                         else str(x)
                     )
                     for x in row

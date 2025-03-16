@@ -51,7 +51,9 @@ def lcp_upload(
     live: bool = False,
     provided_url: str = "",
     check_only: bool = False,
-    **kwargs,
+    delimiter: str = "",
+    quote: str = "",
+    escape: str = "",
 ) -> None:
 
     filt = None
@@ -208,6 +210,9 @@ def lcp_upload(
     url = url.removesuffix("/") + "/create"
     resp = post(url, headers=headers, json=jso)  # type: ignore
     data = resp.json()
+    jso["quote"] = quote
+    jso["delimiter"] = delimiter
+    jso["escape"] = escape
     ret = check_template_and_send(
         data, headers, jso, corpus, base, filt, live, provided_url=provided_url
     )
