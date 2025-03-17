@@ -40,9 +40,8 @@ def esc(value: str | int, quote: str = '"', double: bool = True) -> str:
     return (
         str(value)
         .replace("'", "''" if double else "'")
-        .replace("\\", "\\\\")
         .replace("\\n", "")
-        .replace(quote, "\\" + quote)
+        .replace(quote, quote + quote)
     )
 
 
