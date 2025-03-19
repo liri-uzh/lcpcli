@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import os
 import sys
@@ -169,28 +170,28 @@ def lcp_upload(
         doc_fn = get_file_from_base(doc_name, os.listdir(corpus))
         with open(os.path.join(corpus, doc_fn), "r") as doc_file:
             media_ncol = -1
-            nline = 0
-            while 1:
-                line = doc_file.readline()
-                nline += 1
-                if not line:
-                    break
-                cols = line.rstrip().split("\t")
+            doc_csv = csv.reader(
+                doc_file,
+                delimiter=delimiter or ",",
+                quotechar=quote or '"',
+                escapechar=escape or None,
+            )
+            for nline, cols in enumerate(doc_csv, start=1):
                 if media_ncol < 0:
                     media_ncol = next(n for n, col in enumerate(cols) if col == "media")
                     continue
-                print("media_col", cols[media_ncol].strip("\b"))
-                media_obj = json.loads(cols[media_ncol].strip("\b"))
+                print("media_col", cols[media_ncol])
+                media_obj = json.loads(cols[media_ncol])
                 for media_name, media_attr in has_media.items():
                     if media_attr.get("isOptional"):
                         continue
                     media_filename = media_obj.get(media_name)
                     assert media_filename, ReferenceError(
-                        f"No file referenced for '{media_name}' in document line {nline} ({line})"
+                        f"No file referenced for '{media_name}' in document line {nline} ({cols})"
                     )
                     media_filepath = os.path.join(media_path, media_filename)
                     assert os.path.isfile(media_filepath), FileNotFoundError(
-                        f"File '{media_filename}' not found in {media_path} for document line {nline} ({line})"
+                        f"File '{media_filename}' not found in {media_path} for document line {nline} ({cols})"
                     )
 
     if check_only:
