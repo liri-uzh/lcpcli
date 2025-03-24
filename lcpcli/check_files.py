@@ -8,14 +8,18 @@ from uuid import UUID
 
 EXTENSIONS = (".csv", ".tsv")
 LOOKUP_TYPES = ("dict", "text")
-
-# TODO: categorical
-# TODO: labels
-# TODO: deprel
+NAMEDATALEN = 63
 
 
 def is_lookup(p: dict) -> bool:
     return p.get("type", "") in LOOKUP_TYPES or "ref" in p
+
+
+def try_filename(path: str, no_ext: str) -> str:
+    fpath = os.path.join(path, f"{no_ext}.tsv")
+    if not os.path.exists(fpath):
+        fpath = fpath.replace(".tsv", ".csv")
+    return fpath
 
 
 class Checker:
@@ -39,6 +43,18 @@ class Checker:
             )
         )
 
+    def get_attribute_columns(
+        self, attrs: dict[str, dict]
+    ) -> dict[str, tuple[str, str]]:
+        ret = {}
+        for aname, aprops in attrs.items():
+            self.check_attribute_name(aname)
+            lookup = is_lookup(aprops)
+            acol = f"{aname}_id" if lookup else aname
+            typ = "lookup" if lookup else aprops.get("type", "")
+            ret[aname] = (acol, typ)
+        return ret
+
     def is_anchored(self, layer: str, anchor: str) -> bool:
         layer_conf = self.config["layer"][layer]
         if layer_conf.get("anchoring", {}).get(anchor, False) == True:
@@ -51,6 +67,14 @@ class Checker:
     def check_uuid(self, uuid: str) -> None:
         assert UUID(uuid, version=4), SyntaxError(f"Invalid UUID ({uuid})")
 
+    def check_categorical(self, value: str, values: None | list[str]) -> None:
+        assert len(value.encode("utf-8")) <= NAMEDATALEN, ValueError(
+            f"Found a categorical value ('{value}') that exceeds the database's limit of {NAMEDATALEN} bytes on enum values"
+        )
+        assert values is None or value in values, ValueError(
+            f"Categorical value '{value}' is not in the listed values"
+        )
+
     def check_dict(self, str_obj: str) -> None:
         try:
             json_obj = json.loads(str_obj)
@@ -61,9 +85,18 @@ class Checker:
         )
         return None
 
+    def check_labels(self, bits: str, nbit: int) -> None:
+        assert match(r"^[01]*$", bits), ValueError(
+            f"Labels column should be series of 0s and 1s, got '{bits}'"
+        )
+        assert len(bits) == nbit, ValueError(
+            f"Expected {nbit} bits, got {len(bits)} ('{bits}')"
+        )
+        return None
+
     def check_ftsvector(self, vector: str) -> None:
         units = vector.split(" ")
-        for unit in units:
+        for n, unit in enumerate(units):
             assert unit.startswith("'"), SyntaxError(
                 f"Each value in the tsvector must start with a single quote character ({unit})"
             )
@@ -75,7 +108,7 @@ class Checker:
                 f"Each value in the tsvector must end with a single quote followed by a colon and an integer index ({unit})"
             )
             assert not m[1] or match(r"^([^']|'')+$", m[1]), SyntaxError(
-                f"Each value in the tsvector must double the mid-text single-quote characters"
+                f"Each value in the tsvector must double the mid-text single-quote characters ({n}: {unit})"
             )
         return None
 
@@ -140,6 +173,9 @@ class Checker:
         assert "'" not in name, SyntaxError(
             f"Attribute name '{name}' cannot contain single-quote characters"
         )
+        assert len(name.encode("utf-8")) <= NAMEDATALEN, ValueError(
+            f"Attribute name '{name}' exceeds the maximum length allowed in the database ({NAMEDATALEN} bytes)"
+        )
         return None
 
     def check_attribute_file(
@@ -152,13 +188,11 @@ class Checker:
         attribute_low = attribute_name.lower()
         lay_att = f"{layer_name.lower()}_{attribute_low}"
         typ = attribute_props.get("type", "")
-        fpath = os.path.join(path, f"{lay_att}.csv")
-        if not os.path.exists(fpath):
-            fpath = fpath.replace(".csv", ".tsv")
-        assert os.path.exists(fpath), FileNotFoundError(
-            f"Could not find a file named {lay_att}.csv for attribute '{attribute_name}' of type {typ} for layer '{layer_name}'"
-        )
+        fpath = try_filename(path, lay_att)
         filename = os.path.basename(fpath)
+        assert os.path.exists(fpath), FileNotFoundError(
+            f"Could not find a file named {filename} for attribute '{attribute_name}' of type {typ} for layer '{layer_name}'"
+        )
         with open(fpath, "r") as afile:
             header = self.parseline(afile.readline())
             assert f"{attribute_low}_id" in header, ReferenceError(
@@ -171,13 +205,11 @@ class Checker:
 
     def check_global_attribute_file(self, path: str, glob_attr: str) -> None:
         glob_attr_low = glob_attr.lower()
-        fpath = os.path.join(path, f"global_attribute_{glob_attr_low}.csv")
-        if not os.path.exists(fpath):
-            fpath = fpath.replace(".csv", ".tsv")
-        assert os.path.exists(fpath), FileNotFoundError(
-            f"Could not find a file named global_attribute_{glob_attr_low}.csv for global attribute '{glob_attr}'"
-        )
+        fpath = try_filename(path, f"global_attribute_{glob_attr_low}")
         filename = os.path.basename(fpath)
+        assert os.path.exists(fpath), FileNotFoundError(
+            f"Could not find a file named {filename} for global attribute '{glob_attr}'"
+        )
         with open(fpath, "r") as afile:
             header = self.parseline(afile.readline())
             assert f"{glob_attr_low}_id" in header, ReferenceError(
@@ -190,13 +222,11 @@ class Checker:
 
     def check_labels_file(self, path: str, layer_name: str, aname: str) -> None:
         layer_low = layer_name.lower()
-        fpath = os.path.join(path, f"{layer_low}_labels.csv")
-        if not os.path.exists(fpath):
-            fpath = fpath.replace(".csv", ".tsv")
-        assert os.path.exists(fpath), FileNotFoundError(
-            f"Could not find a file named {layer_low}_labels.csv for attribute '{aname}' of type labels on layer {layer_name}"
-        )
+        fpath = try_filename(path, f"{layer_low}_{aname.lower()}")
         filename = os.path.basename(fpath)
+        assert os.path.exists(fpath), FileNotFoundError(
+            f"Could not find a file named {filename} for attribute '{aname}' of type labels on layer {layer_name}"
+        )
         with open(fpath, "r") as afile:
             header = self.parseline(afile.readline())
             assert "bit" in header, ReferenceError(
@@ -217,59 +247,245 @@ class Checker:
         anchored_stream = self.is_anchored(layer_name, "stream")
         anchored_time = self.is_anchored(layer_name, "time")
         anchored_location = self.is_anchored(layer_name, "location")
+        attrs = layer_props.get("attributes", {})
+        columns = self.get_attribute_columns(attrs)
 
-        fpath = os.path.join(
-            path,
-            layer_low
-            + (
-                "0.csv"
-                if add_zero and layer_name in (token_layer, segment_layer)
-                else ".csv"
-            ),
+        no_ext: str = layer_low + (
+            "0" if add_zero and layer_name in (token_layer, segment_layer) else ""
         )
-        if not os.path.exists(fpath):
-            fpath = fpath.replace(".csv", ".tsv")
-        assert os.path.exists(fpath), FileNotFoundError(
-            f"Could not find a file named {layer_low}.csv for layer '{layer_name}'"
-        )
+        fpath = try_filename(path, no_ext)
         filename = os.path.basename(fpath)
+        assert os.path.exists(fpath), FileNotFoundError(
+            f"Could not find a file named {filename} for layer '{layer_name}'"
+        )
         with open(fpath, "r") as layer_file:
             header = self.parseline(layer_file.readline())
-            if layer_props.get("layerType") == "relation":
-                # TODO: check relational attributes
-                return
-            assert f"{layer_low}_id" in header, ReferenceError(
-                f"Could not find a column named {layer_low}_id in {filename}"
-            )
-            assert not anchored_stream or "char_range" in header, ReferenceError(
-                f"Column 'char_range' missing from file {filename} for stream-anchored layer {layer_name}"
-            )
-            assert not anchored_time or "frame_range" in header, ReferenceError(
-                f"Column 'frame_range' missing from file {filename} for time-anchored layer {layer_name}"
-            )
-            assert not anchored_location or "xy_box" in header, ReferenceError(
-                f"Column 'frame_range' missing from file {filename} for time-anchored layer {layer_name}"
-            )
-            if layer_name == token_layer:
-                assert f"{segment_layer.lower()}_id" in header, ReferenceError(
-                    f"Column '{segment_layer.lower()}_id' missing from file {filename} for token-level layer {layer_name}"
+            is_relation = layer_props.get("layerType") == "relation"
+            if is_relation:
+                assert "source" in attrs, ReferenceError(
+                    f"Could not find an attribute named 'source' for relational layer {layer_name}"
                 )
-            for aname, aprops in layer_props.get("attributes", {}).items():
-                self.check_attribute_name(aname)
-                acol = f"{aname}_id" if is_lookup(aprops) else aname
-                typ = aprops.get("type", "")
-                ref = aprops.get("ref")
-                lookup = typ in LOOKUP_TYPES
+                assert "target" in attrs, ReferenceError(
+                    f"Could not find an attribute named 'target' for relational layer {layer_name}"
+                )
+                source = attrs["source"]
+                target = attrs["target"]
+                assert "name" in source, ReferenceError(
+                    f"Could not find a name for the source attribute of relational layer {layer_name}"
+                )
+                assert "name" in target, ReferenceError(
+                    f"Could not find a name for the source attribute of relational layer {layer_name}"
+                )
+                source_name = source["name"]
+                target_name = target["name"]
+                assert source_name in header, ReferenceError(
+                    f"Could not find a column named '{source_name}' in {filename} for source attribute of relational layer {layer_name}"
+                )
+                assert target_name in header, ReferenceError(
+                    f"Could not find a column named '{target_name}' in {filename} for target attribute of relational layer {layer_name}"
+                )
+            else:
+                assert f"{layer_low}_id" in header, ReferenceError(
+                    f"Could not find a column named {layer_low}_id in {filename}"
+                )
+                assert not anchored_stream or "char_range" in header, ReferenceError(
+                    f"Column 'char_range' missing from file {filename} for stream-anchored layer {layer_name}"
+                )
+                assert not anchored_time or "frame_range" in header, ReferenceError(
+                    f"Column 'frame_range' missing from file {filename} for time-anchored layer {layer_name}"
+                )
+                assert not anchored_location or "xy_box" in header, ReferenceError(
+                    f"Column 'frame_range' missing from file {filename} for time-anchored layer {layer_name}"
+                )
+                if layer_name == token_layer:
+                    assert f"{segment_layer.lower()}_id" in header, ReferenceError(
+                        f"Column '{segment_layer.lower()}_id' missing from file {filename} for token-level layer {layer_name}"
+                    )
+            for aname, (acol, typ) in columns.items():
+                if is_relation and aname in ("source", "target"):
+                    continue
                 assert acol in header, ReferenceError(
                     f"Column '{acol}' is missing from file {filename} for the attribute '{aname}' of layer {layer_name}"
                 )
-                if lookup:
-                    self.check_attribute_file(path, layer_name, aname, aprops)
-                if typ == "labels":
+                if "ref" in attrs[aname]:
+                    self.check_global_attribute_file(path, attrs[aname]["ref"])
+                elif typ == "lookup":
+                    self.check_attribute_file(path, layer_name, aname, attrs[aname])
+                elif typ == "labels":
+                    assert "nlabels" in attrs[aname], ReferenceError(
+                        f"No 'nlabels' reported in the configuration for the attribute '{aname}' of type labels of layer {layer_name}"
+                    )
                     self.check_labels_file(path, layer_name, aname)
-                if ref:
-                    self.check_global_attribute_file(path, ref)
         return None
+
+    def check_existing_file(
+        self, filename: str, directory: str, add_zero: bool = False
+    ) -> None:
+        layer = self.config.get("layer", {})
+        layer_name = ""
+        nullables = set()
+        no_ext, *_ = os.path.splitext(filename)
+        columns = {}
+        if no_ext.startswith("global_attribute_"):
+            aname = no_ext[17:].lower()
+            props = self.config.get("globalAttributes", {}).get(aname)
+            assert props, ReferenceError(
+                f"No correpsonding global attribute defined in the configuration for file {filename}"
+            )
+            columns = {f"{aname}_id": "lookup", aname: "dict"}
+            nullables.add(aname)
+        elif no_ext == "fts_vector":
+            columns = {
+                f"{self.segment.lower()}_id": "uuid",
+                "vector": "ftsvector",
+            }
+        elif "_" in no_ext:
+            lname, aname, *remainder = no_ext.split("_")
+            assert not remainder, SyntaxError(f"Invalid filename: {filename}")
+            props = next(
+                (v for k, v in layer.items() if k.lower() == lname.lower()), None
+            )
+            assert props, ReferenceError(
+                f"No corresponding layer found for file {filename}"
+            )
+            aprops = next(
+                (
+                    v
+                    for k, v in props.get("attributes", {}).items()
+                    if k.lower() == aname.lower()
+                ),
+                None,
+            )
+            assert aprops, ReferenceError(
+                f"Found a file named {filename} but the configuration defines no such attribute for that layer"
+            )
+            typ = aprops.get("type", "")
+            if typ == "labels":
+                columns = {"bit": "int", "label": "text"}
+                nullables.add("label")
+            else:
+                or_type = " or ".join(LOOKUP_TYPES)
+                assert typ in LOOKUP_TYPES, ValueError(
+                    f"Found a file named {filename} even though the corresponding attribute is not of type {or_type}"
+                )
+                columns = {f"{aname}_id": "lookup", aname: typ}
+                if aprops.get("nullable"):
+                    nullables.add(aname)
+        else:
+            layer_name = next(
+                (l for l in layer.keys() if l.lower() == no_ext.lower()), ""
+            )
+            if not layer_name and add_zero and no_ext.endswith("0"):
+                layer_name = next(
+                    (l for l in layer.keys() if l.lower() == no_ext[:-1].lower()),
+                    "",
+                )
+            assert layer_name, ReferenceError(
+                f"No corresponding layer found for file {filename}"
+            )
+            props = layer[layer_name]
+            attrs = props.get("attributes", {})
+            columns = {}
+            for aname, (col_name, typ) in self.get_attribute_columns(attrs).items():
+                columns[col_name] = typ
+                if attrs[aname].get("nullable"):
+                    nullables.add(col_name)
+            if props.get("layerType", "") == "relation":
+                for an in ("source", "target"):
+                    columns.pop(an, "")
+                    columns[attrs[an]["name"]] = (
+                        "uuid" if attrs[an]["entity"] == self.segment else "int"
+                    )
+                    if attrs[an].get("nullable"):
+                        nullables.add(attrs[an]["name"])
+            else:
+                columns[f"{layer_name.lower()}_id"] = (
+                    "uuid" if layer_name == self.segment else "int"
+                )
+                if layer_name == self.token:
+                    columns[f"{self.segment.lower()}_id"] = "uuid"
+                if self.is_anchored(layer_name, "stream"):
+                    columns["char_range"] = "range"
+                if self.is_anchored(layer_name, "time"):
+                    columns["frame_range"] = "range"
+                if self.is_anchored(layer_name, "location"):
+                    columns["xy_box"] = "xy_box"
+                media_slots = self.config["meta"].get("mediaSlots", {})
+                if media_slots and layer_name == self.document:
+                    columns["name"] = "text"
+                    columns["media"] = "dict"
+
+        with open(os.path.join(directory, filename), "r") as input:
+            headers: list[str] = []
+            counter = 0
+            while line := input.readline():
+                counter += 1
+                cols = self.parseline(line)
+                if not headers:
+                    headers = cols
+                    for h in headers:
+                        assert h in columns, ReferenceError(
+                            f"Found unexpected column named {h} in {filename}"
+                        )
+                    continue
+                assert len(cols) == len(headers), SyntaxError(
+                    f"Found {len(cols)} values on line {counter} in {filename}, expected {len(cols)}."
+                )
+                for n, col in enumerate(cols):
+                    typ = columns[headers[n]]
+                    if not col:
+                        assert headers[n] in nullables, ValueError(
+                            f"Found an empty value for column {headers[n]} on line {n+1} of {filename} even though the configuration does not reported it as nullable"
+                        )
+                        continue
+                    if typ == "int":
+                        try:
+                            int(col)
+                        except:
+                            raise ValueError(
+                                f"Excepted int value for column {n+1} ({headers[n]}) on line {counter} in {filename}, got {col} ({line})"
+                            )
+                    else:
+                        try:
+                            if typ == "dict":
+                                self.check_dict(col)
+                            elif typ == "labels":
+                                assert layer_name, NotImplementedError(
+                                    f"Attributes of type 'labels' are only supported on layers ({filename})"
+                                )
+                                aprops = (
+                                    layer[layer_name]
+                                    .get("attributes", {})
+                                    .get(headers[n], {})
+                                )
+                                nbit = aprops["nlabels"]
+                                self.check_labels(col, nbit)
+                            elif typ == "range":
+                                self.check_range(col, headers[n])
+                            elif typ == "xy_box":
+                                self.check_xy_box(col, headers[n])
+                            elif typ == "uuid":
+                                self.check_uuid(col)
+                            elif typ == "ftsvector":
+                                self.check_ftsvector(col)
+                            elif typ == "categorical":
+                                assert layer_name, NotImplementedError(
+                                    f"Attributes of type 'categofical' are only supported on layers ({filename})"
+                                )
+                                aprops = (
+                                    layer[layer_name]
+                                    .get("attributes", {})
+                                    .get(headers[n], {})
+                                )
+                                values = None
+                                if not aprops.get("isGlobal"):
+                                    values = aprops.get("values") or None
+                                self.check_categorical(col, values)
+                        except Exception as e:
+                            l = line.rstrip("\n")
+                            raise ValueError(
+                                f"{e} ({headers[n]} in {filename}:{counter}:{n+1} -- '{l}')"
+                            )
 
     def check_config(self) -> None:
         mandatory_keys = ("layer", "firstClass", "meta")
@@ -309,125 +525,5 @@ class Checker:
         for filename in os.listdir(directory):
             if not filename.endswith(EXTENSIONS):
                 continue
-            no_ext, *_ = os.path.splitext(filename)
-            columns = {}
-            if no_ext.startswith("global_attribute_"):
-                aname = no_ext[17:].lower()
-                props = self.config.get("globalAttributes", {}).get(aname)
-                assert props, ReferenceError(
-                    f"No correpsonding global attribute defined in the configuration for file {filename}"
-                )
-                columns = {f"{aname}_id": "lookup", aname: "dict"}
-            elif no_ext == "fts_vector":
-                columns = {
-                    f"{self.segment.lower()}_id": "uuid",
-                    "vector": "ftsvector",
-                }
-            elif "_" in no_ext:
-                lname, aname, *remainder = no_ext.split("_")
-                assert not remainder, SyntaxError(f"Invalid filename: {filename}")
-                props = next(
-                    (v for k, v in layer.items() if k.lower() == lname.lower()), None
-                )
-                assert props, ReferenceError(
-                    f"No corresponding layer found for file {filename}"
-                )
-                aprops = next(
-                    (
-                        v
-                        for k, v in props.get("attributes", {}).items()
-                        if k.lower() == aname.lower()
-                    ),
-                    None,
-                )
-                assert aprops, ReferenceError(
-                    f"Found a file named {filename} but the configuration defines no such attribute for that layer"
-                )
-                or_type = " or ".join(LOOKUP_TYPES)
-                typ = aprops.get("type", "")
-                assert typ in LOOKUP_TYPES, ValueError(
-                    f"Found a file named {filename} even though the corresponding attribute is not of type {or_type}"
-                )
-                columns = {f"{aname}_id": "lookup", aname: typ}
-            else:
-                layer_name = next(
-                    (l for l in layer.keys() if l.lower() == no_ext.lower()), ""
-                )
-                if not layer_name and add_zero and no_ext.endswith("0"):
-                    layer_name = next(
-                        (l for l in layer.keys() if l.lower() == no_ext[:-1].lower()),
-                        "",
-                    )
-                assert layer_name, ReferenceError(
-                    f"No corresponding layer found for file {filename}"
-                )
-                props = layer[layer_name]
-                if props.get("layerType", "") == "relation":
-                    # TODO: implement this
-                    continue
-                columns = {
-                    (f"{k}_id" if is_lookup(v) else k): (
-                        "lookup" if is_lookup(v) else v.get("type", "")
-                    )
-                    for k, v in props.get("attributes", {}).items()
-                }
-                columns[f"{layer_name.lower()}_id"] = (
-                    "uuid" if layer_name == self.segment else "int"
-                )
-                if layer_name == self.token:
-                    columns[f"{self.segment.lower()}_id"] = "uuid"
-                if self.is_anchored(layer_name, "stream"):
-                    columns["char_range"] = "range"
-                if self.is_anchored(layer_name, "time"):
-                    columns["frame_range"] = "range"
-                if self.is_anchored(layer_name, "location"):
-                    columns["xy_box"] = "xy_box"
-                media_slots = self.config["meta"].get("mediaSlots", {})
-                if media_slots and layer_name == self.document:
-                    columns["name"] = "text"
-                    columns["media"] = "dict"
-
-            with open(os.path.join(directory, filename), "r") as input:
-                headers: list[str] = []
-                counter = 0
-                while line := input.readline():
-                    counter += 1
-                    cols = self.parseline(line)
-                    if not headers:
-                        headers = cols
-                        for h in headers:
-                            assert h in columns, ReferenceError(
-                                f"Found unexpected column named {h} in {filename}"
-                            )
-                        continue
-                    assert len(cols) == len(headers), SyntaxError(
-                        f"Found {len(cols)} values on line {counter} in {filename}, expected {len(cols)}."
-                    )
-                    for n, col in enumerate(cols):
-                        typ = columns[headers[n]]
-                        if typ == "int":
-                            try:
-                                int(col)
-                            except:
-                                raise ValueError(
-                                    f"Excepted int value for column {n} ({headers[n]}) on line {counter} in {filename}, got {col} ({line})"
-                                )
-                        else:
-                            try:
-                                if typ == "dict":
-                                    self.check_dict(col)
-                                # elif typ == "labels":
-                                #     self.check_labels(col)
-                                elif typ == "range":
-                                    self.check_range(col, headers[n])
-                                elif typ == "xy_box":
-                                    self.check_xy_box(col, headers[n])
-                                elif typ == "uuid":
-                                    self.check_uuid(col)
-                                elif typ == "ftsvector":
-                                    self.check_ftsvector(col)
-                            except Exception as e:
-                                raise ValueError(
-                                    f"{e} ({headers[n]} in {filename}:{counter}:{n} -- {line})"
-                                )
+            self.check_existing_file(filename, directory, add_zero)
         return None

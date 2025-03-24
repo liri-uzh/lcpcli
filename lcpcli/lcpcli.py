@@ -3,8 +3,10 @@ import shutil
 
 from collections.abc import Callable
 from inspect import signature
+from json import loads
 from typing import Any
 
+from .check_files import Checker
 from .corpert import Corpert
 from .lcp_upload import lcp_upload
 from .cli import _parse_cmd_line
@@ -59,11 +61,11 @@ then `lcpcli -c {output_path} -k $API_KEY -s $API_SECRET -p $PROJECT_NAME --live
             corpert = Corpert(**self._get_kwargs(Corpert.__init__))
             corpert.run()
 
-        if not upload:
+        if not upload and not self.kwargs["check_only"]:
             print("No upload key or secret passed, exiting now.")
             return None
 
-        if corpert and self.kwargs.get("mode", "") == "upload":
+        if corpert:
             path = self.kwargs.get("output", os.path.dirname(corpert._path))
 
             if not any(i.endswith(".json") for i in os.listdir(path)):
@@ -88,6 +90,20 @@ then `lcpcli -c {output_path} -k $API_KEY -s $API_SECRET -p $PROJECT_NAME --live
         if not self.kwargs.get("corpus"):
             raise ValueError("No corpus found to upload")
 
+        json_file = next(
+            (f for f in os.listdir(self.kwargs["corpus"]) if f.endswith(".json")), None
+        )
+        assert json_file, FileNotFoundError(
+            f"Could not find a JSON configuration file in {self.kwargs['corpus']}"
+        )
+        conf = loads(open(os.path.join(self.kwargs["corpus"], json_file), "r").read())
+        checker = Checker(
+            conf,
+            quote=self.kwargs.get("quote") or '"',
+            delimiter=self.kwargs.get("delimiter") or ",",
+            escape=self.kwargs.get("escape") or None,
+        )
+        checker.run_checks(self.kwargs["corpus"], full=True, add_zero=False)
         return lcp_upload(**self._get_kwargs(lcp_upload))
 
 

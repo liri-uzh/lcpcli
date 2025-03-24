@@ -22,15 +22,6 @@ def _parse_cmd_line():
     )
     parser.add_argument("-o", "--output", type=str, help="Output file path")
     parser.add_argument(
-        "-m",
-        "--mode",
-        type=str,
-        nargs="?",
-        choices=["normal", "upload"],
-        default="normal",
-        help="LCP upload ('upload') or not ('normal', default)",
-    )
-    parser.add_argument(
         "-e", "--extension", type=str, help="Output format when output is a directory"
     )
     parser.add_argument(
@@ -125,7 +116,7 @@ def _parse_cmd_line():
         "--check-only",
         required=False,
         default=False,
-        help="Use live system? If false, use test system.",
+        help="Run the pre-import check without importing.",
         **BOOL_KWARGS,
     )
 

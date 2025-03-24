@@ -76,7 +76,6 @@ class Corpert:
         filter=None,
         lua_filter=None,
         combine=True,
-        mode=None,
         **kwargs,
     ):
         """
@@ -85,7 +84,6 @@ class Corpert:
         """
         self.output = os.path.abspath(output) if output else None
         self._output_format = None
-        self.mode = mode
         if extension:
             self._output_format = extension
         elif self.output and self.output.endswith(
@@ -358,348 +356,270 @@ class Corpert:
         """
         The main routine: read in all input files and print/write them
         """
-        combined = {}
         self._setup_filters()
         # sents = []
         # docs = []
 
-        self.mode = "upload"  # only support upload mode for now
-
-        if self.mode == "upload":
-            ignore_files = set()
-            json_obj = None
-            json_file = next(
-                (
-                    os.path.join(self._path, f)
-                    for f in os.listdir(self._path)
-                    if f.endswith(".json")
-                ),
-                "",
-            )
-            if os.path.isfile(json_file):
-                ignore_files.add(json_file)
-                with open(json_file, "r") as jsf:
-                    json_obj = json.loads(jsf.read())
-            else:
-                json_obj = default_json(
-                    next(reversed(self._path.split(os.path.sep))) or "Anonymous Project"
-                )
-            parent_dir = os.path.dirname(__file__)
-            schema_path = os.path.join(parent_dir, "data", "lcp_corpus_template.json")
-            with open(schema_path) as schema_file:
-                validate(json_obj, json.loads(schema_file.read()))
-                print("validated json schema")
-
-            output_path = self.output or "."
-            os.makedirs(output_path, exist_ok=True) # create the output directory if it doesn't exist
-
-            aligned_entities = {}
-            aligned_entities_segment = {}
-            firstClass = json_obj.get("firstClass", {})
-            for l in firstClass.values():
-                assert l in json_obj.get("layer", {}), ReferenceError(
-                    f"'{l}' is declared in 'firstClass' but could not be found in 'layer'."
-                )
-
-            token_is_char_anchored = (
-                json_obj.get("layer", {})
-                .get(firstClass["token"], {})
-                .get("anchoring", {})
-                .get("stream", False)
-            )
-            # Check the existence of time-anchored files and add them to ignore_files
-            for layer, properties in json_obj.get("layer", {}).items():
-                if (
-                    not properties.get("anchoring", {}).get("time", False)
-                    or layer in firstClass.values()
-                ):
-                    continue
-                fn = get_file_from_base(layer, os.listdir(self._path))
-                fpath = os.path.join(self._path, fn)
-                assert os.path.exists(fpath), FileNotFoundError(
-                    f"Could not find a file named '{fn}' in {self._path} for time-anchored layer '{layer}'"
-                )
-                ignore_files.add(fpath)
-            # Detect the global attributes files and exclude them from the list of files to process
-            for glob_attr in json_obj.get("globalAttributes", {}):
-                stem_name = f"global_attribute_{glob_attr}"
-                filename = get_file_from_base(stem_name, os.listdir(self._path))
-                source = os.path.join(self._path, filename)
-                ignore_files.add(source)
-                assert os.path.exists(source), FileExistsError(
-                    f"No file named '{filename}' found for global attribute '{glob_attr}'"
-                )
-                shutil.copy(source, os.path.join(output_path, filename))
-
-            labels = self._preprocess_labels(json_obj, self._input_files)
-            for layer_name, attributes in labels.items():
-                for attribute_name, attribute_labels in attributes.items():
-                    json_obj["layer"][layer_name]["nlabels"] = len(attribute_labels)
-
-            # Process the input files that are not at the token, segment or document level
-            for layer, properties in json_obj.get("layer", {}).items():
-                if layer in firstClass.values():
-                    continue
-                # Process entities that are spans containing sub-entities (eg. named entities or topics)
-                if (
-                    not token_is_char_anchored
-                    or properties.get("abstract")
-                    or properties.get("layerType") != "span"
-                    or properties.get("contains", "")
-                    not in (firstClass["token"], firstClass["segment"])
-                ):
-                    continue
-                layer_file = os.path.join(
-                    self._path, get_file_from_base(layer, os.listdir(self._path))
-                )
-                assert layer_file, FileExistsError(
-                    f"Could not find a reference file for entity type '{layer}'"
-                )
-                ignore_files.add(layer_file)
-                with open(layer_file, "r") as f:
-                    cols = [x.lower() for x in f.readline().split()]
-                    for a in properties.get("attributes", {}):
-                        assert a.lower() in cols, ReferenceError(
-                            f"No column found for attribute '{a}' in {layer_file}"
-                        )
-                if properties["contains"] == firstClass["token"]:
-                    ae_table, ae_col_names = self._prepare_aligned_entity_dict(
-                        layer_file, layer, json_obj, labels
-                    )
-                    aligned_entities[layer.lower()] = {
-                        "fn": layer_file,
-                        "properties": properties,
-                        "refs": ae_table,
-                        "col_names": ae_col_names,
-                    }
-                else:
-                    aes_table, aes_col_names = self._prepare_aligned_entity_dict(
-                        layer_file, layer, json_obj, labels
-                    )
-                    aligned_entities_segment[layer.lower()] = {
-                        "fn": layer_file,
-                        "properties": properties,
-                        "refs": aes_table,
-                        "col_names": aes_col_names,
-                    }
-            parser = None
-            # Process the remaining input files
-            doc_files = [
-                f
-                for f in self._input_files
-                if (
-                    os.path.isfile(f)
-                    and f not in ignore_files
-                    and os.path.basename(f) != "meta.json"
-                    # discard files named like layer names
-                    and Path(f).stem.lower()
-                    not in {k.lower() for k in json_obj.get("layer", {})}
-                )
-            ]
-            nfiles = len(doc_files)
-            start_time_input_files = time()
-            for nfile, filepath in enumerate(doc_files, start=1):
-                elapsed_time = time() - start_time_input_files
-                print(
-                    "input file",
-                    filepath,
-                    f" ({nfile}/{nfiles}; elapsed {round(elapsed_time, 2)}s;",
-                    f"remaining {round((elapsed_time / nfile) * (nfiles - nfile))}s)",
-                )
-                parser = parser or PARSERS[self._determine_format(filepath)](
-                    config=json_obj, labels=labels
-                )
-                print(filepath)
-                try:
-                    # First pass: check that the file has some content
-                    with open(filepath, "r") as f:
-                        has_content = False
-                        while line := f.readline():
-                            line = line.strip()
-                            if line.startswith("#") or not line:
-                                continue
-                            has_content = True
-                            break
-                        assert has_content, AssertionError("No conllu lines to process")
-                    with open(filepath, "r") as f:
-                        parser.generate_upload_files_generator(
-                            f,
-                            path=output_path,
-                            default_doc={"name": os.path.basename(filepath)},
-                            config=json_obj,
-                            aligned_entities=aligned_entities,
-                            aligned_entities_segment=aligned_entities_segment,
-                        )
-                except Exception as err:
-                    print("Could not process", filepath, ": ", err)
-                    traceback.print_exc()
-            parser.close_upload_files(path=output_path)
-            # Process time-anchored extra layers
-            for layer, properties in json_obj.get("layer", {}).items():
-                if (
-                    not properties.get("anchoring", {}).get("time", False)
-                    or layer in firstClass.values()
-                ):
-                    continue
-                fn = get_file_from_base(layer, os.listdir(self._path))
-                attributes = properties.get("attributes", {})
-                input_col_names = []
-                doc_id_idx = 0
-                start_idx = 0
-                end_idx = 0
-                output_fn = os.path.join(output_path, fn)
-                assert not os.path.exists(output_fn), FileExistsError(
-                    f"The output file '{output_fn}' already exists."
-                )
-                with (
-                    open(os.path.join(self._path, fn), "r") as input_file,
-                    open(output_fn, "w") as output_file,
-                ):
-                    while input_line := input_file.readline():
-                        input_cols = input_line.rstrip("\n").split("\t")
-                        output_cols = []
-                        if not input_col_names:
-                            input_col_names = input_cols
-                            output_cols = [
-                                c.strip()
-                                for c in input_col_names
-                                if c not in ("doc_id", "start", "end")
-                            ]
-                            assert "doc_id" in input_col_names, IndexError(
-                                f"No column named 'doc_id' found in {fn}"
-                            )
-                            assert "start" in input_col_names, IndexError(
-                                f"No column named 'start' found in {fn}"
-                            )
-                            assert "end" in input_col_names, IndexError(
-                                f"No column named 'end' found in {fn}"
-                            )
-                            doc_id_idx = input_cols.index("doc_id")
-                            start_idx = input_cols.index("start")
-                            end_idx = input_cols.index("end")
-                            output_cols.append("frame_range")
-                        else:
-                            output_cols = [
-                                c.strip()
-                                for n, c in enumerate(input_cols)
-                                if n not in (doc_id_idx, start_idx, end_idx)
-                            ]
-                            for a, av in attributes.items():
-                                if av.get("type") != "categorical" or av.get(
-                                    "isGlobal"
-                                ):
-                                    continue
-                                col_n = next(
-                                    (
-                                        n
-                                        for n, cn in enumerate(input_col_names)
-                                        if cn == a.lower()
-                                    ),
-                                    None,
-                                )
-                                if col_n is None:
-                                    continue
-                                av["values"] = av.get("values", [])
-                                value_to_add = input_cols[col_n].strip()
-                                if value_to_add not in av["values"]:
-                                    av["values"].append(value_to_add)
-                            doc_frames = parser.doc_frames[str(input_cols[doc_id_idx])]
-                            times = [float(input_cols[x]) for x in (start_idx, end_idx)]
-                            start, end = [
-                                int(times[n] * 25.0) + doc_frames[0] for n in (0, 1)
-                            ]
-                            if end <= start:
-                                end = int(start) + 1
-                            output_cols.append(f"[{start},{end})")
-                        output_file.write("\t".join(output_cols) + "\n")
-
-            print(f"outfiles written to '{self.output}'.")
-            json_str = json.dumps(json_obj, indent=4)
-            json_path = os.path.join(output_path, "meta.json")
-            open(json_path, "w").write(json_str)
-            # print(f"\n{json_str}\n")
-            print(
-                f"A default meta.json file with the structure above was automatically generated at '{json_path}' for the current corpus."
-            )
-            print(f"Please review it and make any changes as needed in a text editor.")
-            print(
-                f"Once the file contains the proper information, press any key to proceed."
-            )
-            input()
-
+        ignore_files = set()
+        json_obj = None
+        json_file = next(
+            (
+                os.path.join(self._path, f)
+                for f in os.listdir(self._path)
+                if f.endswith(".json")
+            ),
+            "",
+        )
+        if os.path.isfile(json_file):
+            ignore_files.add(json_file)
+            with open(json_file, "r") as jsf:
+                json_obj = json.loads(jsf.read())
         else:
-            format = (self._output_format or "").lstrip(".")
+            json_obj = default_json(
+                next(reversed(self._path.split(os.path.sep))) or "Anonymous Project"
+            )
+        parent_dir = os.path.dirname(__file__)
+        schema_path = os.path.join(parent_dir, "data", "lcp_corpus_template.json")
+        with open(schema_path) as schema_file:
+            validate(json_obj, json.loads(schema_file.read()))
+            print("validated json schema")
 
-            for filepath in self._input_files:
-                print("input file", filepath)
-                if os.path.isfile(filepath):
-                    parser = PARSERS[self._determine_format(filepath)]()
-                else:
-                    parser = self._detect_format_from_string(filepath)
+        output_path = self.output or "."
+        os.makedirs(
+            output_path, exist_ok=True
+        )  # create the output directory if it doesn't exist
 
-                reader = parser.parse_generator(codecs.open(filepath, "r", "utf8"))
-                for sentence in parser.write_generator(reader):
-                    print("writing", sentence)
+        aligned_entities = {}
+        aligned_entities_segment = {}
+        firstClass = json_obj.get("firstClass", {})
+        for l in firstClass.values():
+            assert l in json_obj.get("layer", {}), ReferenceError(
+                f"'{l}' is declared in 'firstClass' but could not be found in 'layer'."
+            )
 
+        token_is_char_anchored = (
+            json_obj.get("layer", {})
+            .get(firstClass["token"], {})
+            .get("anchoring", {})
+            .get("stream", False)
+        )
+        # Check the existence of time-anchored files and add them to ignore_files
+        for layer, properties in json_obj.get("layer", {}).items():
+            if (
+                not properties.get("anchoring", {}).get("time", False)
+                or layer in firstClass.values()
+            ):
                 continue
-                if self._on_disk:
-                    with codecs.open(filepath, "r", "utf8") as fo:
-                        content = fo.read()
-                else:
-                    content = filepath
+            fn = get_file_from_base(layer, os.listdir(self._path))
+            fpath = os.path.join(self._path, fn)
+            assert os.path.exists(fpath), FileNotFoundError(
+                f"Could not find a file named '{fn}' in {self._path} for time-anchored layer '{layer}'"
+            )
+            ignore_files.add(fpath)
+        # Detect the global attributes files and exclude them from the list of files to process
+        for glob_attr in json_obj.get("globalAttributes", {}):
+            stem_name = f"global_attribute_{glob_attr}"
+            filename = get_file_from_base(stem_name, os.listdir(self._path))
+            source = os.path.join(self._path, filename)
+            ignore_files.add(source)
+            assert os.path.exists(source), FileExistsError(
+                f"No file named '{filename}' found for global attribute '{glob_attr}'"
+            )
+            shutil.copy(source, os.path.join(output_path, filename))
 
-                understood = parser.parse(content)
-                if self._filter:
-                    understood = self._apply_filter(understood)
-                if self._lua_filter:
-                    understood = self._apply_lua_filter(understood)
+        labels = self._preprocess_labels(json_obj, self._input_files)
+        for layer_name, attributes in labels.items():
+            for attribute_name, attribute_labels in attributes.items():
+                json_obj["layer"][layer_name]["nlabels"] = len(attribute_labels)
 
-                if len(understood) == 1:
-                    combined[filepath] = next(v for _, v in understood.items())
-                else:
-                    # if 'documents' in understood:
-                    for doc, v in understood.items():
-                        subfilepath = os.path.join(filepath, f"{doc}.{format}")
-                        combined[subfilepath] = v
-                # else:
-                #     combined[filepath] = understood
-
-            return
-
-            if not self.output:
-                print(json.dumps(combined, indent=4, sort_keys=False))
-                return combined
-            elif self._output_format.endswith("json"):
-                self._write_json(combined)
-                return
+        # Process the input files that are not at the token, segment or document level
+        for layer, properties in json_obj.get("layer", {}).items():
+            if layer in firstClass.values():
+                continue
+            # Process entities that are spans containing sub-entities (eg. named entities or topics)
+            if (
+                not token_is_char_anchored
+                or properties.get("abstract")
+                or properties.get("layerType") != "span"
+                or properties.get("contains", "")
+                not in (firstClass["token"], firstClass["segment"])
+            ):
+                continue
+            layer_file = os.path.join(
+                self._path, get_file_from_base(layer, os.listdir(self._path))
+            )
+            assert layer_file, FileExistsError(
+                f"Could not find a reference file for entity type '{layer}'"
+            )
+            ignore_files.add(layer_file)
+            with open(layer_file, "r") as f:
+                cols = [x.lower() for x in f.readline().split()]
+                for a in properties.get("attributes", {}):
+                    assert a.lower() in cols, ReferenceError(
+                        f"No column found for attribute '{a}' in {layer_file}"
+                    )
+            if properties["contains"] == firstClass["token"]:
+                ae_table, ae_col_names = self._prepare_aligned_entity_dict(
+                    layer_file, layer, json_obj, labels
+                )
+                aligned_entities[layer.lower()] = {
+                    "fn": layer_file,
+                    "properties": properties,
+                    "refs": ae_table,
+                    "col_names": ae_col_names,
+                }
             else:
-                parser = PARSERS[format]()
-                if not self._combine:
-                    # print("combined", combined)
-                    for path, data in combined.items():
-                        # text_id = os.path.splitext(os.path.basename(path))[0]
-                        meta = {"id": path, **data.get("meta", {})}
-                        formatted = parser.write(
-                            data.get("sentences", {}), path, combine=False, meta=meta
+                aes_table, aes_col_names = self._prepare_aligned_entity_dict(
+                    layer_file, layer, json_obj, labels
+                )
+                aligned_entities_segment[layer.lower()] = {
+                    "fn": layer_file,
+                    "properties": properties,
+                    "refs": aes_table,
+                    "col_names": aes_col_names,
+                }
+        parser = None
+        # Process the remaining input files
+        doc_files = [
+            f
+            for f in self._input_files
+            if (
+                os.path.isfile(f)
+                and f not in ignore_files
+                and os.path.basename(f) != "meta.json"
+                # discard files named like layer names
+                and Path(f).stem.lower()
+                not in {k.lower() for k in json_obj.get("layer", {})}
+            )
+        ]
+        nfiles = len(doc_files)
+        start_time_input_files = time()
+        for nfile, filepath in enumerate(doc_files, start=1):
+            elapsed_time = time() - start_time_input_files
+            print(
+                "input file",
+                filepath,
+                f" ({nfile}/{nfiles}; elapsed {round(elapsed_time, 2)}s;",
+                f"remaining {round((elapsed_time / nfile) * (nfiles - nfile))}s)",
+            )
+            parser = parser or PARSERS[self._determine_format(filepath)](
+                config=json_obj, labels=labels
+            )
+            print(filepath)
+            try:
+                # First pass: check that the file has some content
+                with open(filepath, "r") as f:
+                    has_content = False
+                    while line := f.readline():
+                        line = line.strip()
+                        if line.startswith("#") or not line:
+                            continue
+                        has_content = True
+                        break
+                    assert has_content, AssertionError("No conllu lines to process")
+                with open(filepath, "r") as f:
+                    parser.generate_upload_files_generator(
+                        f,
+                        path=output_path,
+                        default_doc={"name": os.path.basename(filepath)},
+                        config=json_obj,
+                        aligned_entities=aligned_entities,
+                        aligned_entities_segment=aligned_entities_segment,
+                    )
+            except Exception as err:
+                print("Could not process", filepath, ": ", err)
+                traceback.print_exc()
+        parser.close_upload_files(path=output_path)
+        # Process time-anchored extra layers
+        for layer, properties in json_obj.get("layer", {}).items():
+            if (
+                not properties.get("anchoring", {}).get("time", False)
+                or layer in firstClass.values()
+            ):
+                continue
+            fn = get_file_from_base(layer, os.listdir(self._path))
+            attributes = properties.get("attributes", {})
+            input_col_names = []
+            doc_id_idx = 0
+            start_idx = 0
+            end_idx = 0
+            output_fn = os.path.join(output_path, fn)
+            assert not os.path.exists(output_fn), FileExistsError(
+                f"The output file '{output_fn}' already exists."
+            )
+            with (
+                open(os.path.join(self._path, fn), "r") as input_file,
+                open(output_fn, "w") as output_file,
+            ):
+                while input_line := input_file.readline():
+                    input_cols = input_line.rstrip("\n").split("\t")
+                    output_cols = []
+                    if not input_col_names:
+                        input_col_names = input_cols
+                        output_cols = [
+                            c.strip()
+                            for c in input_col_names
+                            if c not in ("doc_id", "start", "end")
+                        ]
+                        assert "doc_id" in input_col_names, IndexError(
+                            f"No column named 'doc_id' found in {fn}"
                         )
-                        # fixed_path = os.path.join(self.output, os.path.relpath(path))
-                        fixed_path = os.path.join(self.output, os.path.basename(path))
-                        # print(f"writing {len(formatted)} chars to {fixed_path}")
-                        self._write_to_file(fixed_path, formatted)
-                    return
-                else:
-                    if len(combined) == 1:
-                        path, data = combined.popitem()
-                        meta = {"id": path, **data.get("meta", {})}
-                        formatted = parser.write(
-                            data.get("sentences", {}), path, combine=False, meta=meta
+                        assert "start" in input_col_names, IndexError(
+                            f"No column named 'start' found in {fn}"
                         )
+                        assert "end" in input_col_names, IndexError(
+                            f"No column named 'end' found in {fn}"
+                        )
+                        doc_id_idx = input_cols.index("doc_id")
+                        start_idx = input_cols.index("start")
+                        end_idx = input_cols.index("end")
+                        output_cols.append("frame_range")
                     else:
-                        formatted = parser.combine(combined)
-                    self._write_to_file(self.output, formatted)
-                    return
+                        output_cols = [
+                            c.strip()
+                            for n, c in enumerate(input_cols)
+                            if n not in (doc_id_idx, start_idx, end_idx)
+                        ]
+                        for a, av in attributes.items():
+                            if av.get("type") != "categorical" or av.get("isGlobal"):
+                                continue
+                            col_n = next(
+                                (
+                                    n
+                                    for n, cn in enumerate(input_col_names)
+                                    if cn == a.lower()
+                                ),
+                                None,
+                            )
+                            if col_n is None:
+                                continue
+                            av["values"] = av.get("values", [])
+                            value_to_add = input_cols[col_n].strip()
+                            if value_to_add not in av["values"]:
+                                av["values"].append(value_to_add)
+                        doc_frames = parser.doc_frames[str(input_cols[doc_id_idx])]
+                        times = [float(input_cols[x]) for x in (start_idx, end_idx)]
+                        start, end = [
+                            int(times[n] * 25.0) + doc_frames[0] for n in (0, 1)
+                        ]
+                        if end <= start:
+                            end = int(start) + 1
+                        output_cols.append(f"[{start},{end})")
+                    output_file.write("\t".join(output_cols) + "\n")
 
-            raise ValueError(ERROR_MSG.replace("input", "output"))
+        print(f"outfiles written to '{self.output}'.")
+        json_str = json.dumps(json_obj, indent=4)
+        json_path = os.path.join(output_path, "meta.json")
+        open(json_path, "w").write(json_str)
+        # print(f"\n{json_str}\n")
+        print(
+            f"A default meta.json file with the structure above was automatically generated at '{json_path}' for the current corpus."
+        )
+        print(f"Please review it and make any changes as needed in a text editor.")
+        print(
+            f"Once the file contains the proper information, press any key to proceed."
+        )
+        input()
 
 
 def run() -> None:

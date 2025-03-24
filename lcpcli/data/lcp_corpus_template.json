@@ -31,6 +31,10 @@
                         "nullable": {
                             "description": "Whether this attribute's value can be null",
                             "type": "boolean"
+                        },
+                        "nlabels": {
+                            "description": "The number of different labels for an attribute of type labels",
+                            "type": "integer"
                         }
                     },
                     "required": [
@@ -192,7 +196,10 @@
                                 "layerType": {
                                     "description": "Spans contain other entity types whereas units are basic",
                                     "type": "string",
-                                    "enum": ["span","unit"]
+                                    "enum": [
+                                        "span",
+                                        "unit"
+                                    ]
                                 },
                                 "contains": {
                                     "description": "Another entity type (layer) contained in this one",
