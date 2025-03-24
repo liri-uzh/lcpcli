@@ -10,6 +10,8 @@ EXTENSIONS = (".csv", ".tsv")
 LOOKUP_TYPES = ("dict", "text")
 
 # TODO: categorical
+# TODO: labels
+# TODO: deprel
 
 
 def is_lookup(p: dict) -> bool:
@@ -295,11 +297,13 @@ class Checker:
             print("validated json schema")
         return None
 
-    def run_checks(self, directory: str, full: bool = True) -> None:
+    def run_checks(
+        self, directory: str, full: bool = True, add_zero: bool = False
+    ) -> None:
         self.check_config()
         layer = self.config.get("layer", {})
         for layer_name, layer_properties in layer.items():
-            self.check_layer(directory, layer_name, layer_properties)
+            self.check_layer(directory, layer_name, layer_properties, add_zero)
         if not full:
             return None
         for filename in os.listdir(directory):
@@ -349,6 +353,11 @@ class Checker:
                 layer_name = next(
                     (l for l in layer.keys() if l.lower() == no_ext.lower()), ""
                 )
+                if not layer_name and add_zero and no_ext.endswith("0"):
+                    layer_name = next(
+                        (l for l in layer.keys() if l.lower() == no_ext[:-1].lower()),
+                        "",
+                    )
                 assert layer_name, ReferenceError(
                     f"No corresponding layer found for file {filename}"
                 )
