@@ -1,3 +1,4 @@
+import csv
 import json
 import os
 import re
@@ -21,6 +22,17 @@ def is_char_anchored(entity: dict, config: dict) -> bool:
 
 def is_time_anchored(entity: dict, config: dict) -> bool:
     return is_anchored(entity, config, "time")
+
+
+def parse_csv(line, delimiter=",", quotechar='"', escapechar=None) -> list[str]:
+    return next(
+        csv.reader(
+            [line],
+            delimiter=delimiter,
+            quotechar=quotechar,
+            escapechar=escapechar,
+        )
+    )
 
 
 def get_ci(d: dict, p: str, default={}):

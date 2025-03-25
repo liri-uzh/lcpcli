@@ -18,7 +18,6 @@ MISC: Any other annotation.
 import re
 import uuid
 
-from inspect import isgenerator
 from typing import cast
 
 from ._parser import Parser
@@ -32,6 +31,7 @@ from ..utils import (
     Segment,
     Text,
     Token,
+    parse_csv,
 )
 
 RESERVED_KEYS = {"document": ["media"]}
@@ -115,7 +115,7 @@ class CONLLUParser(Parser):
                 current_sentence["meta"][match[1]] = match[2].strip()
             elif re.match(r"\d+[\t\s]", line):
                 line = line.split("\t")
-                line = {k: v for k, v in zip(self._features, line)}
+                line = {k: v.strip() for k, v in zip(self._features, line)}
                 current_sentence["text"].append(line)
 
         if new_doc:
@@ -387,10 +387,7 @@ class CONLLUParser(Parser):
         )
 
         for n, item in enumerate(sent_text):
-            # cols = [n+1, *item[1:]]
-            # cols = [(str(i) if i else '_') for i in cols]
-            # lines.append(f"\t".join(cols))
-            lines.append(f"\t".join([item.get(f, "_") for f in self._features]))
+            lines.append("\t".join([item.get(f, "_") for f in self._features]))
 
         return lines
 

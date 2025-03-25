@@ -17,6 +17,7 @@ import re
 from ..utils import (
     is_char_anchored,
     is_time_anchored,
+    parse_csv,
     get_ci,
     Info,
     Table,
@@ -131,6 +132,16 @@ class Parser(abc.ABC):
             if meta._value:
                 col_names.append("meta")
                 cols.append(str(meta.value).strip())
+                doc_from_conf = self.config["layer"][
+                    self.config["firstClass"]["document"]
+                ]
+                doc_attrs = doc_from_conf.get("attributes", {})
+                doc_attrs["meta"] = doc_attrs.get("meta") or {}
+                for m in meta._value:
+                    if m in doc_attrs["meta"]:
+                        continue
+                    doc_attrs["meta"][m] = {"type": "text"}  # default
+                doc_from_conf["attributes"] = doc_attrs
         for attr_name, attr in doc.attributes.items():
             if attr_name == "meta":
                 continue
@@ -226,7 +237,7 @@ class Parser(abc.ABC):
             while sline := aligned_file.readline():
                 if not sline:
                     break
-                id, *cols = sline.split("\t")
+                id, *cols = parse_csv(sline, delimiter="\t")
                 if id.strip() != fk:
                     continue
                 for n, col in enumerate(c.strip() for c in cols):
@@ -677,16 +688,28 @@ class Parser(abc.ABC):
             ).lower()
             if table_key not in self._tables:
                 continue
-            for a, ap in lp.get("attributes", {}).items():
-                categorical_values = self._tables[table_key].categorical_values.get(a)
-                if not categorical_values:
+            lattrs = lp.get("attributes", {})
+            tab = self._tables[table_key]
+            for aname in tab.real_attributes if l.lower() == tok_name else lattrs:
+                if aname == "meta":
                     continue
-                if ap.get("type") == "categorical" and not ap.get("isGlobal"):
-                    ap["values"] = ap.get("values", [])
-                    ap["values"] += [
-                        v for v in categorical_values if v not in ap["values"]
+                if aname not in lattrs:
+                    lattrs[aname] = {
+                        "type": (
+                            "categorical" if aname in tab.categorical_values else "text"
+                        )
+                    }
+                if aname in tab.categorical_values:
+                    lattrs[aname]["values"] = set(lattrs[aname].get("values", set()))
+                    lattrs[aname]["values"] = [
+                        x
+                        for x in lattrs[aname]["values"].union(
+                            set(tab.categorical_values[aname])
+                        )
                     ]
-
+            if "meta" in tab.col_names and "meta" not in lattrs:
+                lattrs["meta"] = lattrs.get("meta") or {}
+            lp["attributes"] = lattrs
         # for _, v in self._tables.items():
         #     v['file'].close()
 

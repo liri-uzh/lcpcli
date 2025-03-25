@@ -3,7 +3,7 @@ import json
 import os
 
 from jsonschema import validate
-from re import match
+from re import match, findall
 from uuid import UUID
 
 EXTENSIONS = (".csv", ".tsv")
@@ -95,21 +95,23 @@ class Checker:
         return None
 
     def check_ftsvector(self, vector: str) -> None:
-        units = vector.split(" ")
-        for n, unit in enumerate(units):
+        whole_pattern = r"^('\d+([^']|'')*':\d+(\s|$))+$"
+        simple_unit_pattern = r"('([^']|'')*':[^\s]+)(\s|$)"
+        units = findall(simple_unit_pattern, vector)
+        for n, (unit, *_) in enumerate(units):
             assert unit.startswith("'"), SyntaxError(
-                f"Each value in the tsvector must start with a single quote character ({unit})"
+                f"Each value in the tsvector must start with a single quote character ({unit} -- {n})"
             )
             assert match(r"'\d+", unit), SyntaxError(
-                f"Each value in the tsvector must start with a single quote character followed by an integer index ({unit})"
+                f"Each value in the tsvector must start with a single quote character followed by an integer index ({unit} -- {n})"
             )
-            m = match(r"'\d+(.*)':\d+$", unit)
+            m = match(r"'\d+(.*)':\d+\s?$", unit)
             assert m, SyntaxError(
-                f"Each value in the tsvector must end with a single quote followed by a colon and an integer index ({unit})"
+                f"Each value in the tsvector must end with a single quote followed by a colon and an integer index ({unit} -- {n})"
             )
-            assert not m[1] or match(r"^([^']|'')+$", m[1]), SyntaxError(
-                f"Each value in the tsvector must double the mid-text single-quote characters ({n}: {unit})"
-            )
+        assert match(whole_pattern, vector), SyntaxError(
+            f"Invalid tsvector string ({vector})"
+        )
         return None
 
     def check_range(self, range: str, name: str) -> None:
@@ -334,7 +336,7 @@ class Checker:
             )
             columns = {f"{aname}_id": "lookup", aname: "dict"}
             nullables.add(aname)
-        elif no_ext == "fts_vector":
+        elif no_ext == "fts_vector" or (add_zero and no_ext == "fts_vector0"):
             columns = {
                 f"{self.segment.lower()}_id": "uuid",
                 "vector": "ftsvector",
@@ -519,11 +521,13 @@ class Checker:
         self.check_config()
         layer = self.config.get("layer", {})
         for layer_name, layer_properties in layer.items():
+            print(f"Checking layer {layer_name}")
             self.check_layer(directory, layer_name, layer_properties, add_zero)
         if not full:
             return None
         for filename in os.listdir(directory):
             if not filename.endswith(EXTENSIONS):
                 continue
+            print(f"Checking file {filename}")
             self.check_existing_file(filename, directory, add_zero)
         return None

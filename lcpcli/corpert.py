@@ -1,4 +1,3 @@
-import codecs
 import json
 import os
 import shutil
@@ -8,9 +7,6 @@ from pandas import read_csv, isna
 from time import time
 
 from .parsers.conllu import CONLLUParser
-from .parsers.vert import VERTParser
-from .parsers.tei import TEIParser
-from .parsers.json import JSONParser
 
 from .cli import _parse_cmd_line
 from .utils import (
@@ -26,18 +22,12 @@ from jsonschema import validate
 from pathlib import Path
 
 # map between extensions and parsers
-PARSERS = {
-    "conllu": CONLLUParser,
-    "vert": VERTParser,
-    "xml": TEIParser,
-    "tei": TEIParser,
-    "json": JSONParser,
-}
+PARSERS = {"conllu": CONLLUParser}
 
 ERROR_MSG = """
 Unrecognized input format.
 Note: The converter currently supports the following formats:
-.conllu, .xml (TEI), .json and .vert.
+.conllu, .conll
 """
 
 
@@ -86,9 +76,7 @@ class Corpert:
         self._output_format = None
         if extension:
             self._output_format = extension
-        elif self.output and self.output.endswith(
-            (".json", ".xml", ".conllu", ".vert", ".tei")
-        ):
+        elif self.output and self.output.endswith((".conllu", ".conll")):
             self._output_format = os.path.splitext(self.output)[-1]
         if self.output and not os.path.exists(self.output) and not combine:
             os.makedirs(self.output)
@@ -275,10 +263,6 @@ class Corpert:
         """
         if "sent_id = " in content:
             return "conllu"
-        elif "<xml" in content:
-            return "xml"
-        elif "<s sent_id" in content:
-            return "vert"
         return "json"
 
     def _determine_format(self, filepath):
@@ -286,14 +270,8 @@ class Corpert:
         Deduce format from filepath, or from data string if need be
         """
         if os.path.isfile(filepath):
-            if filepath.endswith(".conllu"):
+            if filepath.endswith((".conllu", ".conll")):
                 return "conllu"
-            elif filepath.endswith(".vert"):
-                return "vert"
-            elif filepath.endswith(".xml"):
-                return "xml"
-            elif filepath.endswith(".json"):
-                return "json"
         elif isinstance(filepath, str):
             return self._detect_format_from_string(filepath)
         raise ValueError(ERROR_MSG)
@@ -357,8 +335,6 @@ class Corpert:
         The main routine: read in all input files and print/write them
         """
         self._setup_filters()
-        # sents = []
-        # docs = []
 
         ignore_files = set()
         json_obj = None
@@ -397,16 +373,13 @@ class Corpert:
                 f"'{l}' is declared in 'firstClass' but could not be found in 'layer'."
             )
 
-        token_is_char_anchored = (
-            json_obj.get("layer", {})
-            .get(firstClass["token"], {})
-            .get("anchoring", {})
-            .get("stream", False)
+        token_is_char_anchored = is_char_anchored(
+            json_obj.get("layer", {}).get(firstClass["token"], {}), json_obj
         )
         # Check the existence of time-anchored files and add them to ignore_files
         for layer, properties in json_obj.get("layer", {}).items():
             if (
-                not properties.get("anchoring", {}).get("time", False)
+                not is_time_anchored(properties, json_obj)
                 or layer in firstClass.values()
             ):
                 continue
@@ -430,7 +403,9 @@ class Corpert:
         labels = self._preprocess_labels(json_obj, self._input_files)
         for layer_name, attributes in labels.items():
             for attribute_name, attribute_labels in attributes.items():
-                json_obj["layer"][layer_name]["nlabels"] = len(attribute_labels)
+                json_obj["layer"][layer_name]["attriubtes"][attribute_name][
+                    "nlabels"
+                ] = len(attribute_labels)
 
         # Process the input files that are not at the token, segment or document level
         for layer, properties in json_obj.get("layer", {}).items():
@@ -533,7 +508,7 @@ class Corpert:
         # Process time-anchored extra layers
         for layer, properties in json_obj.get("layer", {}).items():
             if (
-                not properties.get("anchoring", {}).get("time", False)
+                not is_time_anchored(properties, json_obj)
                 or layer in firstClass.values()
             ):
                 continue
