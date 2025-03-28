@@ -445,7 +445,7 @@ class Checker:
                             int(col)
                         except:
                             raise ValueError(
-                                f"Excepted int value for column {n+1} ({headers[n]}) on line {counter} in {filename}, got {col} ({line})"
+                                f"Excepted int value for column #{n+1} ({headers[n]}) on line {counter} in {filename}, got {col} ({line})"
                             )
                     else:
                         try:
