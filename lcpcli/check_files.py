@@ -437,7 +437,7 @@ class Checker:
                     typ = columns[headers[n]]
                     if not col:
                         assert headers[n] in nullables, ValueError(
-                            f"Found an empty value for column {headers[n]} on line {n+1} of {filename} even though the configuration does not reported it as nullable"
+                            f"Found an empty value for column {headers[n]} on line {counter} of {filename} even though the configuration does not reported it as nullable"
                         )
                         continue
                     if typ == "int":
