@@ -430,8 +430,6 @@ def monitor_upload(new_url: str, headers: dict[str, Any], jso: dict[str, Any]) -
         resp = post(new_url, headers=headers, params=jso)  # type: ignore
         data = resp.json()
 
-        print("monitoring", data)
-
         if data.get("status") != status and data["status"] not in bads:
             for k, v in data.items():
                 if k != "target" and progbar:

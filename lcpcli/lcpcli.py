@@ -48,7 +48,7 @@ class Lcpcli:
             output_path = os.path.join(full_destination, "output")
             print(
                 f"""Example data files copied to {full_destination}.
-Use `lcpcli -i {input_path} -o {output_path} -m upload` to preprocess the data,
+Use `lcpcli -i {input_path} -o {output_path}` to preprocess the data,
 then `lcpcli -c {output_path} -k $API_KEY -s $API_SECRET -p $PROJECT_NAME --live` to upload the corpus to LCP"""
             )
             return None
@@ -70,6 +70,11 @@ then `lcpcli -c {output_path} -k $API_KEY -s $API_SECRET -p $PROJECT_NAME --live
 
             if not any(i.endswith(".json") for i in os.listdir(path)):
                 raise FileNotFoundError(f"No JSON file found in {path}")
+
+            print(
+                f"Please review the content of the configuration file, then press any key to proceed."
+            )
+            input()
 
             output_dir = os.path.join(path, "_upload")
             os.makedirs(output_dir, exist_ok=True)

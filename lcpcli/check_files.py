@@ -57,8 +57,8 @@ class Checker:
 
     def is_anchored(self, layer: str, anchor: str) -> bool:
         layer_conf = self.config["layer"][layer]
-        if layer_conf.get("anchoring", {}).get(anchor, False) == True:
-            return True
+        if "anchoring" in layer_conf:
+            return layer_conf["anchoring"].get(anchor, False)
         contained_layer = layer_conf.get("contains", "")
         if contained_layer in self.config["layer"]:
             return self.is_anchored(contained_layer, anchor)
@@ -431,7 +431,7 @@ class Checker:
                         )
                     continue
                 assert len(cols) == len(headers), SyntaxError(
-                    f"Found {len(cols)} values on line {counter} in {filename}, expected {len(cols)}."
+                    f"Found {len(cols)} values on line {counter} in {filename}, expected {len(headers)}."
                 )
                 for n, col in enumerate(cols):
                     typ = columns[headers[n]]

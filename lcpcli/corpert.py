@@ -14,6 +14,8 @@ from .utils import (
     get_file_from_base,
     is_char_anchored,
     is_time_anchored,
+    parse_csv,
+    to_csv,
     LookupTable,
     Sentence,
 )
@@ -130,7 +132,7 @@ class Corpert:
                     found_comma = False
                     headers = []
                     while line := input.readline():
-                        cells = [c.strip() for c in line.split("\t")]
+                        cells = parse_csv(line)
                         if not headers:
                             headers = cells
                             if aname not in [c.lower() for c in cells]:
@@ -163,9 +165,9 @@ class Corpert:
                             f"Warning: file {output_fn} already exists -- overwriting it"
                         )
                     with open(output_fn, "w") as output:
-                        output.write("\t".join(["bit", "label"]))
+                        output.write(to_csv(["bit", "label"]))
                         for n, lab in enumerate(layer_attr_labels):
-                            output.write("\n" + "\t".join([str(n), lab]))
+                            output.write(to_csv([str(n), lab]))
         return labels
 
     def _prepare_aligned_entity_dict(
@@ -185,7 +187,7 @@ class Corpert:
         lookup_tables: dict[str, LookupTable] = {}
         categorical_values: dict[str, set[str]] = {}
 
-        file_content = read_csv(filename, sep="\t")
+        file_content = read_csv(filename)
         # Prepare the column names
         #   ae_col_names are the columns in the (future) output file
         #   col_names are the columns (minus ID) from the input file
@@ -428,7 +430,7 @@ class Corpert:
             )
             ignore_files.add(layer_file)
             with open(layer_file, "r") as f:
-                cols = [x.lower() for x in f.readline().split()]
+                cols = [x.lower() for x in parse_csv(f.readline())]
                 for a in properties.get("attributes", {}):
                     assert a.lower() in cols, ReferenceError(
                         f"No column found for attribute '{a}' in {layer_file}"
@@ -527,12 +529,12 @@ class Corpert:
                 open(output_fn, "w") as output_file,
             ):
                 while input_line := input_file.readline():
-                    input_cols = input_line.rstrip("\n").split("\t")
+                    input_cols = parse_csv(input_line)
                     output_cols = []
                     if not input_col_names:
                         input_col_names = input_cols
                         output_cols = [
-                            c.strip()
+                            c
                             for c in input_col_names
                             if c not in ("doc_id", "start", "end")
                         ]
@@ -580,7 +582,7 @@ class Corpert:
                         if end <= start:
                             end = int(start) + 1
                         output_cols.append(f"[{start},{end})")
-                    output_file.write("\t".join(output_cols) + "\n")
+                    output_file.write(to_csv(output_cols))
 
         print(f"outfiles written to '{self.output}'.")
         json_str = json.dumps(json_obj, indent=4)
@@ -591,10 +593,6 @@ class Corpert:
             f"A default meta.json file with the structure above was automatically generated at '{json_path}' for the current corpus."
         )
         print(f"Please review it and make any changes as needed in a text editor.")
-        print(
-            f"Once the file contains the proper information, press any key to proceed."
-        )
-        input()
 
 
 def run() -> None:

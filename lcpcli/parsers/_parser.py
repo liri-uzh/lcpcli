@@ -237,7 +237,7 @@ class Parser(abc.ABC):
             while sline := aligned_file.readline():
                 if not sline:
                     break
-                id, *cols = parse_csv(sline, delimiter="\t")
+                id, *cols = parse_csv(sline)
                 if id.strip() != fk:
                     continue
                 for n, col in enumerate(c.strip() for c in cols):
@@ -432,8 +432,9 @@ class Parser(abc.ABC):
                         if attr_name in real_attributes:
                             continue
                         if (
-                            not attr_value.value
+                            not attr_value._value
                             and attr_name not in tok_attrs_from_conf
+                            and attr_name not in aligned_entities
                         ):
                             continue
                         real_attributes[attr_name] = True
@@ -690,8 +691,13 @@ class Parser(abc.ABC):
                 continue
             lattrs = lp.get("attributes", {})
             tab = self._tables[table_key]
-            for aname in tab.real_attributes if l.lower() == tok_name else lattrs:
+            is_token = l.lower() == tok_name
+            for aname in tab.real_attributes if is_token else lattrs:
                 if aname == "meta":
+                    continue
+                if is_token and (
+                    aname in ("head", "deprel") or aname in aligned_entities
+                ):
                     continue
                 if aname not in lattrs:
                     lattrs[aname] = {

@@ -87,6 +87,11 @@
             "abstract": false,
             "layerType": "span",
             "contains": "Token",
+            "anchoring": {
+                "location": false,
+                "stream": true,
+                "time": false
+            },
             "attributes": {
                 "form": {
                     "isGlobal": false,

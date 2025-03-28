@@ -1,0 +1,14 @@
+shot_id,doc_id,start,end,view
+1,Bunny,0.00,8.00,wide angle
+2,Bunny,8.05,12.50,low angle
+3,Bunny,12.75,16.00,face-cam
+4,Bunny,16.20,20.75,closeup
+5,Bunny,21.00,23.02,reverse
+6,Bunny,23.05,24.90,high angle
+7,Bunny,25.00,27.50,closeup
+8,Bunny,27.55,32.05,high angle
+9,Bunny,32.10,41.90,wide angle
+10,Bunny,42.05,43.05,low angle
+11,Bunny,43.10,51.75,wide angle
+12,Bunny,51.90,55.00,high angle
+13,Bunny,55.10,62.00,medium closeup

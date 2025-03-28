@@ -1,4 +1,5 @@
 import csv
+import io
 import json
 import os
 import re
@@ -9,8 +10,8 @@ from pathlib import Path
 
 
 def is_anchored(entity: dict, config: dict, anchor: str) -> bool:
-    if entity.get("anchoring", {}).get(anchor, False):
-        return True
+    if "anchoring" in entity:
+        return entity["anchoring"].get(anchor, False)
     if entity.get("contains", "") in config.get("layer", {}):
         return is_anchored(config["layer"][entity["contains"]], config, anchor)
     return False
@@ -22,6 +23,14 @@ def is_char_anchored(entity: dict, config: dict) -> bool:
 
 def is_time_anchored(entity: dict, config: dict) -> bool:
     return is_anchored(entity, config, "time")
+
+
+def to_csv(values: list[str], delimiter=",", quotechar='"', escapechar=None) -> str:
+    with io.StringIO() as strio:
+        csv.writer(
+            strio, delimiter=delimiter, quotechar=quotechar, escapechar=escapechar
+        ).writerow(values)
+        return strio.getvalue()
 
 
 def parse_csv(line, delimiter=",", quotechar='"', escapechar=None) -> list[str]:
