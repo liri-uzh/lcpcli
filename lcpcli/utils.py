@@ -57,11 +57,17 @@ def get_file_from_base(fn: str, files: list[str]) -> str:
     return out_fn
 
 
-def esc(value: str | int, quote: str = '"', double: bool = True) -> str:
+def esc(
+    value: str | int,
+    quote: str = '"',
+    double: bool = True,
+    escape_backslash: bool = False,
+) -> str:
     return (
         str(value)
         .replace("'", "''" if double else "'")
         .replace("\\n", "")
+        .replace("\\", "\\\\" if escape_backslash else "\\")
         .replace(quote, quote + quote)
     )
 
@@ -218,8 +224,8 @@ class Sentence:
         return key_list
 
     @staticmethod
-    def _esc(string):
-        return esc(string)
+    def _esc(string, **kwargs):
+        return esc(string, **kwargs)
 
     def __init__(self, lines, parser):
         self._comments = [l for l in lines if l.startswith("# ")]
@@ -353,14 +359,14 @@ class Sentence:
                 deprel,  # 8
             ]
 
-            fts_str += f" '1{self._esc(word)}':{n_fts}"
+            fts_str += f" '1{self._esc(word, escape_backslash=True)}':{n_fts}"
             if lemma:
-                fts_str += f" '2{self._esc(lemma)}':{n_fts}"
+                fts_str += f" '2{self._esc(lemma, escape_backslash=True)}':{n_fts}"
             if upos:
                 # escaping UPOS not needed
                 fts_str += f" '3{upos}':{n_fts}"
             if xpos:
-                fts_str += f" '6{self._esc(xpos)}':{n_fts}"
+                fts_str += f" '6{self._esc(xpos, escape_backslash=True)}':{n_fts}"
             n_fts += 1
 
             # update global word id and index
