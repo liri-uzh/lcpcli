@@ -311,8 +311,9 @@ class Sentence:
             if "-" not in k
         }
         for elem in sent:
-            fts_str += f" '4{elem[2]}':{tok_id2sent_idx[elem[1]]}"
-            fts_str += f" '5{elem[2]}':{tok_id2sent_idx[elem[1]]}"
+            val = self._esc(elem[2])
+            fts_str += f" '4{val}':{tok_id2sent_idx[elem[1]]}"
+            fts_str += f" '5{val}':{tok_id2sent_idx[elem[1]]}"
 
         return fts_str
 
