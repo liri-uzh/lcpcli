@@ -195,7 +195,7 @@ class Checker:
         assert os.path.exists(fpath), FileNotFoundError(
             f"Could not find a file named {filename} for attribute '{attribute_name}' of type {typ} for layer '{layer_name}'"
         )
-        with open(fpath, "r") as afile:
+        with open(fpath, "r", encoding="utf-8") as afile:
             header = self.parseline(afile.readline())
             assert f"{attribute_low}_id" in header, ReferenceError(
                 f"Column {attribute_low}_id missing from file {filename} for attribute '{attribute_name}' of type {typ} for layer {layer_name}"
@@ -212,7 +212,7 @@ class Checker:
         assert os.path.exists(fpath), FileNotFoundError(
             f"Could not find a file named {filename} for global attribute '{glob_attr}'"
         )
-        with open(fpath, "r") as afile:
+        with open(fpath, "r", encoding="utf-8") as afile:
             header = self.parseline(afile.readline())
             assert f"{glob_attr_low}_id" in header, ReferenceError(
                 f"Column {glob_attr_low}_id missing from file {filename} for global attribute '{glob_attr}'"
@@ -229,7 +229,7 @@ class Checker:
         assert os.path.exists(fpath), FileNotFoundError(
             f"Could not find a file named {filename} for attribute '{aname}' of type labels on layer {layer_name}"
         )
-        with open(fpath, "r") as afile:
+        with open(fpath, "r", encoding="utf-8") as afile:
             header = self.parseline(afile.readline())
             assert "bit" in header, ReferenceError(
                 f"Column bit missing from file {filename} for labels attribute '{aname}' on layer {layer_name}"
@@ -260,7 +260,7 @@ class Checker:
         assert os.path.exists(fpath), FileNotFoundError(
             f"Could not find a file named {filename} for layer '{layer_name}'"
         )
-        with open(fpath, "r") as layer_file:
+        with open(fpath, "r", encoding="utf-8") as layer_file:
             header = self.parseline(layer_file.readline())
             is_relation = layer_props.get("layerType") == "relation"
             if is_relation:
@@ -417,7 +417,7 @@ class Checker:
                     columns["name"] = "text"
                     columns["media"] = "dict"
 
-        with open(os.path.join(directory, filename), "r") as input:
+        with open(os.path.join(directory, filename), "r", encoding="utf-8") as input:
             headers: list[str] = []
             counter = 0
             while line := input.readline():
@@ -510,7 +510,7 @@ class Checker:
                 )
         parent_dir = os.path.dirname(__file__)
         schema_path = os.path.join(parent_dir, "data", "lcp_corpus_template.json")
-        with open(schema_path) as schema_file:
+        with open(schema_path, "r", encoding="utf-8") as schema_file:
             validate(self.config, json.loads(schema_file.read()))
             print("validated json schema")
         return None
