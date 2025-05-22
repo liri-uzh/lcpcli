@@ -6,3 +6,4 @@ build/
 dist/
 dist/
 lcpcli.egg-info/
+tests/tmp_data
