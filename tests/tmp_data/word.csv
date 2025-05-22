@@ -1,0 +1,5 @@
+word_id,sentence_id,char_range,form_id
+1,34f21a19-2f5d-4f1f-8bd7-de29b10755c0,"[0,6)",1
+2,34f21a19-2f5d-4f1f-8bd7-de29b10755c0,"[6,12)",2
+3,ab8419e0-c71a-4916-af03-3d6e724a0ad4,"[12,16)",3
+4,ab8419e0-c71a-4916-af03-3d6e724a0ad4,"[17,23)",2

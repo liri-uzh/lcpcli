@@ -21,12 +21,13 @@ def create_corpus():
         original="bye world", keywords=["negative", "greetings"], unsure=True
     )
     t3 = c.Word("bye")
+    s2.add(t3)
     t3.make()
     comm = c.Comment(value="pause")
     comm.set_char(c._char_counter, c._char_counter + 1)
     c._char_counter += 1
     t4 = c.Word("world")
-    s2.add(t3, t4)
+    s2.add(t4)
     s2.make()
     d1 = c.Book(s1, s2, title="first document")
     d1.make()

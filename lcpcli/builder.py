@@ -229,6 +229,18 @@ class Layer:
             assert re.match(r"[a-z][a-zA-Z0-9]+", name), RuntimeError()
             Attribute(self, name, value)
 
+    def find_in_parents(self, parent_name: str):
+        if not self._parents:
+            return None
+        parent = next((p for p in self._parents if p._name == parent_name), None)
+        if parent:
+            return parent
+        for p in self._parents:
+            parent = p.find_in_parents(parent_name)
+            if parent:
+                return parent
+        return None
+
     def make(self):
         if self._made:
             return
@@ -241,7 +253,7 @@ class Layer:
             self._id = str(mapping.counter)
         rows = [self._id]
         if is_token:
-            seg_parent = next(l for l in self._parents if l._name == corpus._segment)
+            seg_parent = self.find_in_parents(corpus._segment)
             rows.append(seg_parent._id)
             char_low = corpus._char_counter
             corpus._char_counter = (
@@ -334,7 +346,7 @@ class Layer:
         # All attributes
         for aname, aopts in mapping.attributes.items():
             attr = self._attributes.get(aname, None)
-            val = attr._value
+            val = attr._value if attr else ""
             if val in (None, ""):
                 assert not is_token or aname != "form", RuntimeError(
                     "Token cannot have an empty form!"
@@ -362,7 +374,6 @@ class Layer:
                         lookupid = len(alookup) + 1
                         alookup[val] = lookupid
                         mapping.csv[aname].writerow([lookupid, val])
-                    attr._lookup = lookupid
                     val = str(lookupid)
             if val is None:
                 val = ""
@@ -418,7 +429,6 @@ class Attribute:
     def __init__(self, layer: Layer, name: str, value: Any = None):
         self._name = name
         self._value = value
-        self._lookup: int | None = None
         self._layer = layer
         atype = "text"
         if isinstance(value, (list, set)):

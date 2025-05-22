@@ -1,0 +1,87 @@
+{
+    "meta": {
+        "name": "my test corpus",
+        "author": "placeholder",
+        "corpusDescription": "placeholder",
+        "date": "placeholder",
+        "version": 1
+    },
+    "firstClass": {
+        "token": "Word",
+        "segment": "Sentence",
+        "document": "Book"
+    },
+    "layer": {
+        "Word": {
+            "anchoring": {
+                "stream": true,
+                "time": false,
+                "location": false
+            },
+            "layerType": "unit",
+            "attributes": {
+                "form": {
+                    "type": "text",
+                    "nullable": false
+                }
+            }
+        },
+        "Sentence": {
+            "anchoring": {
+                "stream": true,
+                "time": false,
+                "location": false
+            },
+            "layerType": "span",
+            "attributes": {
+                "original": {
+                    "type": "categorical",
+                    "nullable": true,
+                    "values": [
+                        "hello world",
+                        "bye world",
+                        ""
+                    ]
+                },
+                "keywords": {
+                    "type": "labels",
+                    "nullable": true,
+                    "nlabels": 3
+                },
+                "unsure": {
+                    "type": "number",
+                    "nullable": true
+                }
+            },
+            "contains": "Word"
+        },
+        "Comment": {
+            "anchoring": {
+                "stream": false,
+                "time": false,
+                "location": false
+            },
+            "layerType": "unit",
+            "attributes": {}
+        },
+        "Book": {
+            "anchoring": {
+                "stream": true,
+                "time": false,
+                "location": false
+            },
+            "layerType": "span",
+            "attributes": {
+                "title": {
+                    "type": "categorical",
+                    "nullable": true,
+                    "values": [
+                        "first document",
+                        ""
+                    ]
+                }
+            },
+            "contains": "Sentence"
+        }
+    }
+}
