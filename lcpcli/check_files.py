@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+import sys
 
 from jsonschema import validate
 from re import match, findall
@@ -25,6 +26,7 @@ def try_filename(path: str, no_ext: str) -> str:
 class Checker:
 
     def __init__(self, config, **kwargs):
+        csv.field_size_limit(sys.maxsize)
         self.config = config
         self.token = config.get("firstClass", {}).get("token", "")
         self.segment = config.get("firstClass", {}).get("segment", "")
