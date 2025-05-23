@@ -1,3 +1,5 @@
+# TODO: left_anchor and right_anchor in relation layers
+
 import csv
 import json
 import os
@@ -123,6 +125,11 @@ class Corpus:
                     headers.append("frame_range")
                 if a == "location":
                     headers.append("xy_box")
+            is_relation = any(
+                a["type"] == "entity" for a in mapping.attributes.values()
+            )
+            if is_relation:
+                headers = []
             header_n_to_attr: dict[int, str] = {}
             labels: dict[int, int] = {}
             texts_to_categorical: dict[int, str] = {}
@@ -241,8 +248,14 @@ class Corpus:
                 "layerType": "unit",
                 "attributes": {},
             }
+            is_relation = any(
+                a["type"] == "entity" for a in mapping.attributes.values()
+            )
             for a in mapping.anchorings:
                 toconf["anchoring"][a] = True
+            if is_relation:
+                toconf.pop("anchoring")
+                toconf["layerType"] = "relation"
             if mapping.contains:
                 toconf["contains"] = sorted(
                     mapping.contains,
@@ -250,12 +263,20 @@ class Corpus:
                 )[0]
                 toconf["layerType"] = "span"
             for aname, aopts in mapping.attributes.items():
+                aname_in_conf = aname
                 if aopts["type"] == "categorical":
                     aopts["values"] = [v for v in mapping.lookups[aname]]
                 if aopts["type"] == "ref":
                     aopts.pop("type")
                     aopts.pop("nullable", "")
-                toconf["attributes"][aname] = aopts
+                if aopts["type"] == "entity":
+                    aopts.pop("type")
+                    aopts["name"] = aname
+                    if "source" in toconf["attributes"] or aopts.get("nullable"):
+                        aname_in_conf = "target"
+                    else:
+                        aname_in_conf = "source"
+                toconf["attributes"][aname_in_conf] = aopts
             config["layer"][layer] = toconf
         with open(os.path.join(destination, "config.json"), "w") as config_output:
             config_output.write(json.dumps(config, indent=4))
@@ -326,6 +347,7 @@ class Layer:
         corpus = self._corpus
         is_token = self._name == corpus._token
         is_segment = self._name == corpus._segment
+        is_relation = any(a._type == "entity" for a in self._attributes.values())
         mapping = corpus._layers[self._name]
         mapping.counter = mapping.counter + 1
         if not is_segment:
@@ -434,17 +456,29 @@ class Layer:
                         anamelow = aname.lower()
                         mapping.csvs[aname].writerow([f"{anamelow}_id", anamelow])
         # All attributes
+        if is_relation:
+            rows = []
         for aname, aopts in mapping.attributes.items():
             attr = self._attributes.get(aname, None)
+            atype = aopts["type"]
             val = attr._value if attr else ""
             if val in (None, ""):
                 assert not is_token or aname != "form", RuntimeError(
                     "Token cannot have an empty form!"
                 )
                 aopts["nullable"] = True
-            if aopts["type"] in ATYPES_LOOKUP:
+            if atype == "entity" and val:
+                aopts["entity"] = attr._ref
+                assert isinstance(val, Layer), RuntimeError(
+                    f"Reference to a non-layer entity ({attr})"
+                )
+                assert val._made, RuntimeError(
+                    f"Entity referenced in relation layer {self._name} not made yet ({val})"
+                )
+                val = val._id
+            if atype in ATYPES_LOOKUP:
                 alookup = mapping.lookups[aname]
-                if aopts["type"] == "labels":
+                if atype == "labels":
                     nlabels = int(aopts.get("nlabels", len(alookup)))
                     bits = ["0" for _ in range(nlabels)]
                     for lab in val:
@@ -465,7 +499,7 @@ class Layer:
                         alookup[val] = lookupid
                         mapping.csvs[aname].writerow([lookupid, val])
                     val = lookupid
-            if aopts["type"] == "dict":
+            if atype == "dict":
                 keys = mapping.attributes[aname].setdefault("keys", {})
                 for k, v in json.loads(attr._value).items():
                     if k in keys:
@@ -572,6 +606,9 @@ class Attribute:
             atype = "ref"
             self._ref = value._name
             self._value = value._id
+        elif isinstance(value, Layer):
+            atype = "entity"
+            self._ref = value._name
         self._type = atype
         layer._attributes[name] = self
 
