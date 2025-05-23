@@ -67,6 +67,12 @@ class Corpus:
         document: str = "Document",
         segment: str = "Segment",
         token: str = "Token",
+        author: str = "placeholder",
+        description: str = "placeholder",
+        date: str = "placeholder",
+        version: int | float = 1,
+        url: str = "placeholder",
+        license: str = "placeholder",
     ):
         self._name = name
         self._document = document
@@ -76,6 +82,12 @@ class Corpus:
         self._files: dict[str, Any] = {}
         self._char_counter: int = 0
         self._global_attributes: dict[str, dict] = {}
+        self._author = author
+        self._corpus_description = description
+        self._date = date
+        self._version = version
+        self._url = url
+        self._license = license
 
     def _csv_writer(self, fn: str):
         tmp = tempfile.NamedTemporaryFile(
@@ -221,9 +233,11 @@ class Corpus:
         config: dict[str, Any] = {
             "meta": {
                 "name": self._name,
-                "author": "placeholder",
-                "corpusDescription": "placeholder",
-                "date": "placeholder",
+                "author": self._author,
+                "corpusDescription": self._corpus_description,
+                "date": self._date,
+                "url": self._url,
+                "license": self._license,
                 "version": 1,
             },
             "firstClass": {

@@ -11,7 +11,9 @@ TMP_FOLDER = os.path.join(os.path.dirname(__file__), "tmp_data")
 def create_corpus():
     shutil.rmtree(TMP_FOLDER)
     os.makedirs(TMP_FOLDER)
-    c = Corpus("my test corpus")
+    c = Corpus(
+        "my test corpus", description="This is just a test corpus", author="Jeremy"
+    )
     t1 = c.Token("hello")
     t2 = c.Token("world")
     s1 = c.Segment(t1, t2)
