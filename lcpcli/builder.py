@@ -53,7 +53,7 @@ class LayerMapping:
         self.counter = 0
         self.contains: list[str] = []
         self.anchorings: list[str] = []
-        if layer._name == corpus._token:
+        if layer._name in (corpus._token, corpus._segment):
             self.anchorings.append("stream")
         self.media: None | dict = None
 
@@ -244,7 +244,10 @@ class Corpus:
             for a in mapping.anchorings:
                 toconf["anchoring"][a] = True
             if mapping.contains:
-                toconf["contains"] = mapping.contains[0]
+                toconf["contains"] = sorted(
+                    mapping.contains,
+                    key=lambda c: c in (self._token, self._segment, self._document),
+                )[0]
                 toconf["layerType"] = "span"
             for aname, aopts in mapping.attributes.items():
                 if aopts["type"] == "categorical":
@@ -286,17 +289,36 @@ class Layer:
             return get_layer_method(layer)
         return super().__getattribute__(name)
 
-    def find_in_parents(self, parent_name: str):
+    def _find_in_parents(self, parent_name: str):
         if not self._parents:
             return None
         parent = next((p for p in self._parents if p._name == parent_name), None)
         if parent:
             return parent
         for p in self._parents:
-            parent = p.find_in_parents(parent_name)
+            parent = p._find_in_parents(parent_name)
             if parent:
                 return parent
         return None
+
+    def _in_stream(self, checked: set[str] = set()) -> bool:
+        """
+        Return True if this layer should be anchored to the stream
+        In particular, if the previous sibling is stream-anchored
+        """
+        self_a = self._corpus._layers[self._name].anchorings
+        if "stream" in self_a:
+            return True
+        now_checked: set[str] = checked.union({self._name})
+        for p in self._parents:
+            if any(
+                l._in_stream(checked=now_checked)
+                for l in p._contains
+                if p._name not in now_checked
+            ):
+                self_a.append("stream")
+                return True
+        return False
 
     def make(self):
         if self._made:
@@ -320,7 +342,7 @@ class Layer:
             rows.append(doc_name)
             rows.append(json.dumps(self._media))
         if is_token:
-            seg_parent = self.find_in_parents(corpus._segment)
+            seg_parent = self._find_in_parents(corpus._segment)
             rows.append(seg_parent._id)
             char_low = corpus._char_counter
             corpus._char_counter = (
@@ -371,13 +393,13 @@ class Layer:
                 )
             if fts:
                 mapping.csvs["_fts"].writerow([self._id, " ".join(fts)])
-        elif is_segment:
-            # segment with no tokens
+        # occupy at least 1 char in the stream if anchored
+        if not self._anchorings.get("stream") and self._in_stream():
             self._anchorings["stream"] = [
                 corpus._char_counter,
                 corpus._char_counter + 1,
             ]
-            corpus._char_counter = corpus._char_counter + 1
+            corpus._char_counter += 1
         for a in self._anchorings:
             if a in mapping.anchorings:
                 continue

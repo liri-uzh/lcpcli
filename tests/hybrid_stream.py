@@ -18,17 +18,13 @@ def create_corpus():
     s1.unsure = False
     s1.make()
     s2 = c.Sentence(
-        original="bye world", keywords=["negative", "greetings"], unsure=True
+        c.Word("bye"),
+        c.Comment(value="pause"),
+        c.Word("world"),
+        original="bye world",
+        keywords=["negative", "greetings"],
+        unsure=True,
     )
-    t3 = c.Word("bye")
-    s2.add(t3)
-    t3.make()
-    comm = c.Comment(value="pause")
-    comm.set_char(c._char_counter, c._char_counter + 1)
-    c._char_counter += 1
-    comm.make()
-    t4 = c.Word("world")
-    s2.add(t4)
     s2.make()
     d1 = c.Book(s1, s2, title="first document")
     d1.make()
