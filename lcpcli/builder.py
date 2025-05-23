@@ -108,7 +108,7 @@ class Corpus:
             return get_layer_method(layer)
         return super().__getattribute__(name)
 
-    def make(self, destination: str = "./"):
+    def make(self, destination: str = "./", is_global: dict = {}):
         # second pass + write final files
         for layer_name, mapping in self._layers.items():
             lname = layer_name.lower()
@@ -264,7 +264,10 @@ class Corpus:
                 toconf["layerType"] = "span"
             for aname, aopts in mapping.attributes.items():
                 aname_in_conf = aname
-                if aopts["type"] == "categorical":
+                ais_global = aname in is_global.get(layer, {})
+                if ais_global:
+                    aopts["isGlobal"] = True
+                if aopts["type"] == "categorical" and not ais_global:
                     aopts["values"] = [v for v in mapping.lookups[aname]]
                 if aopts["type"] == "ref":
                     aopts.pop("type")
