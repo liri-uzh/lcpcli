@@ -81,7 +81,7 @@ def sorted_dict(d: dict) -> dict:
         elif isinstance(v, list):
             v = sorted(v)
         ret[k] = v
-    return v
+    return ret
 
 
 class CustomDict:

@@ -12,12 +12,20 @@ from .utils import sorted_dict
 
 # ATYPES = ("text", "categorical", "number", "dict", "labels")
 ATYPES_LOOKUP = ("text", "dict", "labels")
+NAMEDATALEN = 63
 
 
 def get_layer_method(layer: "Layer"):
     corpus = layer._corpus
 
     def layer_method(*args, **kwargs):
+        if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
+            # global attribute
+            corpus._layers.pop(layer._name, "")
+            fname = f"{layer._name.lower()}.csv"
+            corpus._files[fname].close()
+            corpus._files.pop(fname)
+            return GlobalAttribute(corpus, layer._name, args[0])
         largs = [a for a in args]
         if layer._name == corpus._token and isinstance(largs[0], str):
             form = largs.pop(0)
@@ -47,6 +55,7 @@ class LayerMapping:
         self.anchorings: list[str] = []
         if layer._name == corpus._token:
             self.anchorings.append("stream")
+        self.media: None | dict = None
 
 
 class Corpus:
@@ -102,6 +111,9 @@ class Corpus:
         for layer_name, mapping in self._layers.items():
             lname = layer_name.lower()
             headers = [f"{lname}_id"]
+            if mapping.media:
+                headers.append("name")
+                headers.append("media")
             if layer_name == self._token:
                 headers.append(f"{self._segment.lower()}_id")
             for a in mapping.anchorings:
@@ -126,7 +138,7 @@ class Corpus:
                     can_categorize = (
                         not (is_token and aname in ("form", "lemma"))
                         and len(lookup) <= 50
-                        and all(len(v) < 65 for v in lookup)
+                        and all(len(v) < NAMEDATALEN for v in lookup)
                     )
                     if can_categorize:
                         texts_to_categorical[na] = aname
@@ -136,7 +148,7 @@ class Corpus:
                 elif atype == "labels":
                     labels[na] = len(lookup)
                     headers.append(aname)
-                elif atype in ATYPES_LOOKUP:
+                elif atype in ATYPES_LOOKUP or atype == "ref":
                     headers.append(f"{aname}_id")
                 else:
                     headers.append(aname)
@@ -214,6 +226,15 @@ class Corpus:
             },
             "layer": {},
         }
+        if self._global_attributes:
+            config["globalAttributes"] = {
+                k.lower(): {"type": "dict", "keys": v["keys"]}
+                for k, v in self._global_attributes.items()
+            }
+        if media := self._layers[self._document].media:
+            config["meta"]["mediaSlots"] = {
+                k: {"mediaType": v, "isOptional": False} for k, v in media.items()
+            }
         for layer, mapping in self._layers.items():
             toconf: dict = {
                 "anchoring": {"stream": False, "time": False, "location": False},
@@ -228,6 +249,9 @@ class Corpus:
             for aname, aopts in mapping.attributes.items():
                 if aopts["type"] == "categorical":
                     aopts["values"] = [v for v in mapping.lookups[aname]]
+                if aopts["type"] == "ref":
+                    aopts.pop("type")
+                    aopts.pop("nullable", "")
                 toconf["attributes"][aname] = aopts
             config["layer"][layer] = toconf
         with open(os.path.join(destination, "config.json"), "w") as config_output:
@@ -244,6 +268,7 @@ class Layer:
         self._parents: list[Layer] = []
         self._id: str = ""
         self._made: bool = False
+        self._media: dict | None = None
 
     def __setattr__(self, name: str, value: Any):
         if name.startswith("_"):
@@ -284,6 +309,16 @@ class Layer:
         if not is_segment:
             self._id = str(mapping.counter)
         rows = [self._id]
+        if self._media:
+            doc_name = f"{self._name} {self._id}"
+            if "name" in self._attributes:
+                name_attr = self._attributes.pop("name")
+                doc_name = name_attr._value
+                assert len(doc_name) < NAMEDATALEN, RuntimeError(
+                    f"Found a {self._name} named '{doc_name}': names must have less than {NAMEDATALEN} characters"
+                )
+            rows.append(doc_name)
+            rows.append(json.dumps(self._media))
         if is_token:
             seg_parent = self.find_in_parents(corpus._segment)
             rows.append(seg_parent._id)
@@ -363,7 +398,9 @@ class Layer:
                     True if mapping.counter > 1 else False
                 ),  # adding a new attribute
             }
-            if atype in ATYPES_LOOKUP:
+            if atype == "ref":
+                mapping.attributes[aname]["ref"] = attr._ref
+            elif atype in ATYPES_LOOKUP:
                 if aname not in mapping.lookups:
                     mapping.lookups[aname] = {}
                 if aname not in mapping.csvs:
@@ -406,6 +443,18 @@ class Layer:
                         alookup[val] = lookupid
                         mapping.csvs[aname].writerow([lookupid, val])
                     val = lookupid
+            if aopts["type"] == "dict":
+                keys = mapping.attributes[aname].setdefault("keys", {})
+                for k, v in json.loads(attr._value).items():
+                    if k in keys:
+                        continue
+                    keys[k] = {
+                        "type": (
+                            "dict"
+                            if isinstance(v, dict)
+                            else ("number" if isinstance(v, (int, float)) else "text")
+                        )
+                    }
             if val is None:
                 val = ""
             elif val in (True, False):
@@ -414,12 +463,14 @@ class Layer:
             rows.append("" if val == None else str(val))
         mapping.csvs["_main"].writerow(rows)
         self._made = True
+        return self
 
     def set_time(self, *args):
         if len(args) == 2:
             self._anchorings["time"] = args
         elif args[0] is False:
             self._anchorings.pop("time", "")
+        return self
 
     def get_time(self) -> list[int]:
         return self._anchorings.get("time", [])
@@ -432,6 +483,7 @@ class Layer:
             self._anchorings["stream"] = args
         elif args[0] is False:
             self._anchorings.pop("stream", "")
+        return self
 
     def get_char(self) -> list[int]:
         return self._anchorings.get("char", [])
@@ -441,9 +493,29 @@ class Layer:
             self._anchorings["location"] = args
         elif args[0] is False:
             self._anchorings.pop("location", "")
+        return self
 
     def get_xy(self) -> list[int]:
         return self._anchorings.get("location", [])
+
+    def set_media(self, name: str, file: str, media_type: str | None = None):
+        assert self._name == self._corpus._document, RuntimeError(
+            "Cannot set media on non-document layer"
+        )
+        if self._media is None:
+            self._media = {}
+        self._media[name] = file
+        mapping = self._corpus._layers[self._name]
+        if mapping.media is None:
+            mapping.media = {}
+        if media_type is None:
+            media_type = "audio"
+            if file.lower().endswith(
+                (".mp4", ".avi", ".mov", ".wmv", ".webm", ".flv", ".mkv")
+            ):
+                media_type = "video"
+        mapping.media[name] = media_type
+        return self
 
     def add(self, *layers: "Layer"):
         assert not self._contains or all(
@@ -453,6 +525,7 @@ class Layer:
         for layer in layers:
             if self not in layer._parents:
                 layer._parents.append(self)
+        return self
 
 
 class Attribute:
@@ -460,14 +533,23 @@ class Attribute:
         self._name = name
         self._value = value
         self._layer = layer
+        self._ref = None
         atype = "text"
         if isinstance(value, (list, set)):
             atype = "labels"
         elif isinstance(value, dict):
             atype = "dict"
+            value = {
+                k: ",".join(x for x in v) if isinstance(v, (list, set)) else v
+                for k, v in value.items()
+            }
             self._value = json.dumps(sorted_dict(value))
         elif isinstance(value, (int, float)):
             atype = "number"
+        elif isinstance(value, GlobalAttribute):
+            atype = "ref"
+            self._ref = value._name
+            self._value = value._id
         self._type = atype
         layer._attributes[name] = self
 
@@ -475,14 +557,30 @@ class Attribute:
 class GlobalAttribute:
     def __init__(self, corpus: Corpus, name: str, value: dict = {}):
         self._name = name
+        value = {
+            k: ",".join(x for x in v) if isinstance(v, (list, set)) else v
+            for k, v in value.items()
+        }
         self._value = value
         if name not in corpus._global_attributes:
             lname = name.lower()
+            csv_writer = corpus._csv_writer(f"global_attribute_{lname}.csv")
+            csv_writer.writerow([f"{lname}_id", lname])
             corpus._global_attributes[name] = {
-                "csv": corpus._csv_writer(f"global_attribute_{lname}.csv"),
+                "csv": csv_writer,
                 "ids": {},
+                "keys": {
+                    k: {
+                        "type": (
+                            "dict"
+                            if isinstance(v, dict)
+                            else ("number" if isinstance(v, (int, float)) else "text")
+                        )
+                    }
+                    for k, v in value.items()
+                },
             }
         mapping = corpus._global_attributes[name]
         self._id = str(value.get("id", len(mapping["ids"]) + 1))
         mapping["ids"][self._id] = 1
-        mapping["csv"].writerow([self._id, value])
+        mapping["csv"].writerow([self._id, json.dumps(value)])
