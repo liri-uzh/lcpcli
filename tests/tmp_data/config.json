@@ -38,31 +38,30 @@
                     "type": "categorical",
                     "nullable": true,
                     "values": [
-                        "hello world",
-                        "bye world",
+                        "(empty)",
                         ""
                     ]
-                },
-                "keywords": {
-                    "type": "labels",
-                    "nullable": true,
-                    "nlabels": 3
-                },
-                "unsure": {
-                    "type": "number",
-                    "nullable": true
                 }
             },
             "contains": "Word"
         },
-        "Comment": {
+        "NamedEntity": {
             "anchoring": {
-                "stream": false,
+                "stream": true,
                 "time": false,
                 "location": false
             },
-            "layerType": "unit",
-            "attributes": {}
+            "layerType": "span",
+            "attributes": {
+                "form": {
+                    "type": "categorical",
+                    "nullable": false,
+                    "values": [
+                        "cruel world"
+                    ]
+                }
+            },
+            "contains": "Word"
         },
         "Book": {
             "anchoring": {
@@ -74,10 +73,10 @@
             "attributes": {
                 "title": {
                     "type": "categorical",
-                    "nullable": true,
+                    "nullable": false,
                     "values": [
                         "first document",
-                        ""
+                        "second document"
                     ]
                 }
             },

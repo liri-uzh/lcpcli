@@ -72,6 +72,18 @@ def esc(
     )
 
 
+def sorted_dict(d: dict) -> dict:
+    ret = {}
+    for k in sorted(d):
+        v = d[k]
+        if isinstance(v, dict):
+            v = sorted_dict(v)
+        elif isinstance(v, list):
+            v = sorted(v)
+        ret[k] = v
+    return v
+
+
 class CustomDict:
     def __init__(self, is_ufeat=False):
         self._dictionary = {}

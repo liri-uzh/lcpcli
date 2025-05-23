@@ -8,6 +8,8 @@ import shutil
 from typing import Any
 from uuid import uuid4
 
+from .utils import sorted_dict
+
 # ATYPES = ("text", "categorical", "number", "dict", "labels")
 ATYPES_LOOKUP = ("text", "dict", "labels")
 
@@ -34,10 +36,10 @@ class LayerMapping:
     def __init__(self, layer: "Layer"):
         corpus = layer._corpus
         lname = layer._name.lower()
-        self.csv: dict[str, Any] = {"_main": corpus._csv_writer(f"{lname}.csv")}
+        self.csvs: dict[str, Any] = {"_main": corpus._csv_writer(f"{lname}.csv")}
         if layer._name == corpus._segment:
-            self.csv["_fts"] = corpus._csv_writer(f"fts_vector.csv")
-            self.csv["_fts"].writerow([f"{lname}_id", "vector"])
+            self.csvs["_fts"] = corpus._csv_writer(f"fts_vector.csv")
+            self.csvs["_fts"].writerow([f"{lname}_id", "vector"])
         self.attributes: dict[str, Any] = {}
         self.lookups: dict[str, Any] = {}
         self.counter = 0
@@ -109,7 +111,7 @@ class Corpus:
                     headers.append("frame_range")
                 if a == "location":
                     headers.append("xy_box")
-            n_non_attr_headers = len(headers)
+            header_n_to_attr: dict[int, str] = {}
             labels: dict[int, int] = {}
             texts_to_categorical: dict[int, str] = {}
             for na, (aname, aopts) in enumerate(
@@ -128,13 +130,7 @@ class Corpus:
                     )
                     if can_categorize:
                         texts_to_categorical[na] = aname
-                        aopts["type"] = "categorical"
                         headers.append(aname)
-                        afn = f"{lname}_{aname.lower()}.csv"
-                        tmp_path = self._files[afn].name
-                        self._files[afn].close()
-                        os.remove(tmp_path)
-                        self._files.pop(afn, "")
                     else:
                         headers.append(f"{aname}_id")
                 elif atype == "labels":
@@ -144,6 +140,7 @@ class Corpus:
                     headers.append(f"{aname}_id")
                 else:
                     headers.append(aname)
+                header_n_to_attr[na] = aname
             lfn = f"{lname}.csv"
             ifile = self._files[lfn]
             ifile.seek(0)
@@ -151,8 +148,24 @@ class Corpus:
                 csv_writer = csv.writer(output)
                 csv_writer.writerow(headers)
                 for row in csv.reader(ifile):
-                    while len(row) < len(headers):
-                        row.append("")
+                    # fill in missing columns
+                    for nr in range(len(row), len(headers)):
+                        aname = header_n_to_attr[nr]
+                        aopts = mapping.attributes[aname]
+                        if aopts["type"] not in ("text", "dict"):
+                            row.append("")
+                            continue
+                        lookup = mapping.lookups[aname]
+                        lookupval: Any = (
+                            "" if aopts["type"] == "text" else json.dumps(dict({}))
+                        )
+                        lookupid: int | None = lookup.get(lookupval, None)
+                        if lookupid is None:
+                            lookupid = len(lookup) + 1
+                            lookup[lookupval] = lookupid
+                            mapping.csvs[aname].writerow([lookupid, lookupval])
+                        row.append(str(lookupid))
+                    # optimize each column that needs to be optimized
                     for nc, val in enumerate(row):
                         if nc in labels:
                             while len(val) < labels[nc]:
@@ -166,6 +179,16 @@ class Corpus:
                                 if str(v) == val
                             )
                     csv_writer.writerow(row)
+            for aname in texts_to_categorical.values():
+                mapping.attributes[aname]["type"] = "categorical"
+                afn = f"{lname}_{aname.lower()}.csv"
+                tmp_path = self._files[afn].name
+                self._files[afn].close()
+                os.remove(tmp_path)
+                self._files.pop(afn, "")
+                print(
+                    f"Turned {layer_name}->{aname} from text to categorical; delete lookup file"
+                )
             tmp_path = ifile.name
             ifile.close()
             os.remove(tmp_path)
@@ -229,6 +252,15 @@ class Layer:
             assert re.match(r"[a-z][a-zA-Z0-9]+", name), RuntimeError()
             Attribute(self, name, value)
 
+    def __getattribute__(self, name: str):
+        if re.match(r"[A-Z]", name):
+            corpus = self._corpus
+            layer = corpus._add_layer(name)
+            self._contains.append(layer)
+            layer._parents.append(self)
+            return get_layer_method(layer)
+        return super().__getattribute__(name)
+
     def find_in_parents(self, parent_name: str):
         if not self._parents:
             return None
@@ -266,7 +298,7 @@ class Layer:
                 for a in ("stream", "time", "location")
                 if not self._anchorings.get(a)
             }
-            fts: list[str] = []
+            fts = []
             for nc, child in enumerate(self._contains):
                 child.make()
                 if child._name not in mapping.contains:
@@ -303,11 +335,7 @@ class Layer:
                     )
                 )
             if fts:
-                mapping.csv["_fts"].writerow([self._id, " ".join(fts)])
-            for a in self._anchorings:
-                if a in mapping.anchorings:
-                    continue
-                mapping.anchorings.append(a)
+                mapping.csvs["_fts"].writerow([self._id, " ".join(fts)])
         elif is_segment:
             # segment with no tokens
             self._anchorings["stream"] = [
@@ -315,6 +343,10 @@ class Layer:
                 corpus._char_counter + 1,
             ]
             corpus._char_counter = corpus._char_counter + 1
+        for a in self._anchorings:
+            if a in mapping.anchorings:
+                continue
+            mapping.anchorings.append(a)
         for anc_name, anc_val in self._anchorings.items():
             v = f"[{anc_val[0]},{anc_val[1]})"
             if anc_name == "location":
@@ -334,15 +366,14 @@ class Layer:
             if atype in ATYPES_LOOKUP:
                 if aname not in mapping.lookups:
                     mapping.lookups[aname] = {}
-                if aname not in mapping.csv:
+                if aname not in mapping.csvs:
                     fn = f"{self._name.lower()}_{aname.lower()}.csv"
-                    mapping.csv[aname] = corpus._csv_writer(fn)
+                    mapping.csvs[aname] = corpus._csv_writer(fn)
                     if atype == "labels":
-                        mapping.csv[aname].writerow(["bit", "label"])
+                        mapping.csvs[aname].writerow(["bit", "label"])
                     else:
                         anamelow = aname.lower()
-                        mapping.csv[aname].writerow([f"{anamelow}_id", anamelow])
-
+                        mapping.csvs[aname].writerow([f"{anamelow}_id", anamelow])
         # All attributes
         for aname, aopts in mapping.attributes.items():
             attr = self._attributes.get(aname, None)
@@ -361,7 +392,7 @@ class Layer:
                         nlab = alookup.get(lab, None)
                         if nlab is None:
                             nlab = len(alookup) + 1
-                            mapping.csv[aname].writerow([nlab, lab])
+                            mapping.csvs[aname].writerow([nlab, lab])
                         alookup[lab] = nlab
                         while len(bits) < nlab:
                             bits.append("0")
@@ -373,17 +404,16 @@ class Layer:
                     if lookupid is None:
                         lookupid = len(alookup) + 1
                         alookup[val] = lookupid
-                        mapping.csv[aname].writerow([lookupid, val])
-                    val = str(lookupid)
+                        mapping.csvs[aname].writerow([lookupid, val])
+                    val = lookupid
             if val is None:
                 val = ""
             elif val in (True, False):
                 val = int(val)
             val = str(val)
             rows.append("" if val == None else str(val))
-        mapping.csv["_main"].writerow(rows)
-
-        self._made = 1
+        mapping.csvs["_main"].writerow(rows)
+        self._made = True
 
     def set_time(self, *args):
         if len(args) == 2:
@@ -435,6 +465,7 @@ class Attribute:
             atype = "labels"
         elif isinstance(value, dict):
             atype = "dict"
+            self._value = json.dumps(sorted_dict(value))
         elif isinstance(value, (int, float)):
             atype = "number"
         self._type = atype
