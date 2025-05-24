@@ -283,10 +283,10 @@ class Corpus:
                     aopts["isGlobal"] = True
                 if aopts["type"] == "categorical" and not ais_global:
                     aopts["values"] = [v for v in mapping.lookups[aname]]
-                if aopts["type"] == "ref":
+                elif aopts["type"] == "ref":
                     aopts.pop("type")
                     aopts.pop("nullable", "")
-                if aopts["type"] == "entity":
+                elif aopts["type"] == "entity":
                     aopts.pop("type")
                     aopts["name"] = aname
                     if "source" in toconf["attributes"] or aopts.get("nullable"):
@@ -352,7 +352,7 @@ class Layer:
             if any(
                 l._in_stream(checked=now_checked)
                 for l in p._contains
-                if p._name not in now_checked
+                if l._name not in now_checked
             ):
                 self_a.append("stream")
                 return True
@@ -460,7 +460,7 @@ class Layer:
                 ),  # adding a new attribute
             }
             if atype == "ref":
-                mapping.attributes[aname]["ref"] = attr._ref
+                mapping.attributes[aname]["ref"] = attr._ref.lower()
             elif atype in ATYPES_LOOKUP:
                 if aname not in mapping.lookups:
                     mapping.lookups[aname] = {}
@@ -559,7 +559,7 @@ class Layer:
         return self
 
     def get_char(self) -> list[int]:
-        return self._anchorings.get("char", [])
+        return self._anchorings.get("stream", [])
 
     def set_xy(self, *args):
         if len(args) == 4:
