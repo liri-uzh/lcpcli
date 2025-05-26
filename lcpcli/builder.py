@@ -10,7 +10,7 @@ import shutil
 from typing import Any
 from uuid import uuid4
 
-from .utils import sorted_dict
+from .utils import esc, sorted_dict
 
 # ATYPES = ("text", "categorical", "number", "dict", "labels")
 ATYPES_LOOKUP = ("text", "dict", "labels")
@@ -425,7 +425,7 @@ class Layer:
                 # FTS
                 fts.append(
                     " ".join(
-                        f"'{na+1}{attr._value}':{nc+1}"
+                        f"'{na+1}{esc(attr._value)}':{nc+1}"
                         for na, attr in enumerate(child._attributes.values())
                         if attr._type in ("categorical", "text")
                     )
