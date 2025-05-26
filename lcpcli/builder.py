@@ -130,7 +130,7 @@ class Corpus:
         date: str = "placeholder",
         version: int | float = 1,
         url: str = "placeholder",
-        license: str = "placeholder",
+        license: str | None = None,
     ):
         self._name = name
         self._document = document
@@ -300,7 +300,6 @@ class Corpus:
                 "corpusDescription": self._corpus_description,
                 "date": self._date,
                 "url": self._url,
-                "license": self._license,
                 "version": 1,
             },
             "firstClass": {
@@ -310,6 +309,8 @@ class Corpus:
             },
             "layer": {},
         }
+        if self._license:
+            config["meta"]["license"] = self._license
         if self._global_attributes:
             config["globalAttributes"] = {
                 k.lower(): {"type": "dict", "keys": v["keys"]}
