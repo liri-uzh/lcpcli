@@ -10,8 +10,9 @@ import shutil
 from typing import Any
 from uuid import uuid4
 
-from .utils import esc, sorted_dict
+from .utils import esc, sorted_dict, NestedSet
 
+ANCHORINGS = ("stream", "time", "location")
 # ATYPES = ("text", "categorical", "number", "dict", "labels")
 ATYPES_LOOKUP = ("text", "dict", "labels")
 NAMEDATALEN = 63
@@ -39,6 +40,62 @@ def get_layer_method(layer: "Layer"):
             setattr(layer, aname, avalue)
         return layer
 
+    def make_all(*args: Layer):
+        if len(args) < 1:
+            return
+        assert all(isinstance(a, Layer) for a in args), RuntimeError(
+            "Can only make a list of layers"
+        )
+        mapping = corpus._layers[args[0]._name]
+        relation_attrs: set[str] = set()
+        # find the two relational attributes (type entity)
+        for a in args:
+            for aname, attr in a._attributes.items():
+                if attr._type != "entity":
+                    continue
+                relation_attrs.add(aname)
+            if len(relation_attrs) >= 2:
+                break
+        if not relation_attrs:
+            # Not a relational layer: make and return
+            for a in args:
+                a.make()
+            return
+        # source is the attribute that's missing in at least one layer
+        source_a = next(
+            ra for ra in relation_attrs if any(ra not in a._attributes for a in args)
+        )
+        target_a = next(ra for ra in relation_attrs if ra != source_a)
+        # reference nested sets by target's id
+        nested_sets = {
+            a._attributes[target_a]._value._id: NestedSet(
+                a._attributes[target_a]._value._id
+            )
+            for a in args
+        }
+        roots = []
+        for a in args:
+            target_id = a._attributes[target_a]._value._id
+            if source_a not in a._attributes:
+                # a layer without a source is a root
+                roots.append(nested_sets[target_id])
+                continue
+            # add this layer's target as a child of the source
+            source_id = a._attributes[source_a]._value._id
+            nested_sets[source_id].add(nested_sets[target_id])
+        # compute all the roots
+        for r in roots:
+            r.compute_anchors(mapping.nested_set_counter)
+            mapping.nested_set_counter = r.right + 1
+        # now it's time to make the layers
+        for a in args:
+            target_id = a._attributes[target_a]._value._id
+            nested_set = nested_sets[target_id]
+            a._nested_set = [nested_set.left, nested_set.right]
+            a.make()
+
+    setattr(layer_method, "make", make_all)
+
     return layer_method
 
 
@@ -53,6 +110,7 @@ class LayerMapping:
         self.attributes: dict[str, Any] = {}
         self.lookups: dict[str, Any] = {}
         self.counter = 0
+        self.nested_set_counter: int = 1
         self.contains: list[str] = []
         self.anchorings: list[str] = []
         if layer._name in (corpus._token, corpus._segment):
@@ -130,7 +188,9 @@ class Corpus:
                 headers.append("media")
             if layer_name == self._token:
                 headers.append(f"{self._segment.lower()}_id")
-            for a in mapping.anchorings:
+            for a in ANCHORINGS:
+                if a not in mapping.anchorings:
+                    continue
                 if a == "stream":
                     headers.append("char_range")
                 if a == "time":
@@ -142,6 +202,9 @@ class Corpus:
             )
             if is_relation:
                 headers = []
+                if mapping.nested_set_counter > 1:
+                    headers.append("left_anchor")
+                    headers.append("right_anchor")
             header_n_to_attr: dict[int, str] = {}
             labels: dict[int, int] = {}
             texts_to_categorical: dict[int, str] = {}
@@ -273,7 +336,7 @@ class Corpus:
             if mapping.contains:
                 toconf["contains"] = sorted(
                     mapping.contains,
-                    key=lambda c: c in (self._token, self._segment, self._document),
+                    key=lambda c: c not in (self._token, self._segment, self._document),
                 )[0]
                 toconf["layerType"] = "span"
             for aname, aopts in mapping.attributes.items():
@@ -294,6 +357,9 @@ class Corpus:
                     else:
                         aname_in_conf = "source"
                 toconf["attributes"][aname_in_conf] = aopts
+            if mapping.nested_set_counter > 1:
+                toconf["attributes"]["left_anchor"] = {"type": "number"}
+                toconf["attributes"]["right_anchor"] = {"type": "number"}
             config["layer"][layer] = toconf
         with open(os.path.join(destination, "config.json"), "w") as config_output:
             config_output.write(json.dumps(config, indent=4))
@@ -310,6 +376,7 @@ class Layer:
         self._id: str = ""
         self._made: bool = False
         self._media: dict | None = None
+        self._nested_set: list = []
 
     def __setattr__(self, name: str, value: Any):
         if name.startswith("_"):
@@ -390,9 +457,7 @@ class Layer:
             self._anchorings["stream"] = [char_low, corpus._char_counter]
         elif self._contains:
             unset_anchorings = {
-                a: []
-                for a in ("stream", "time", "location")
-                if not self._anchorings.get(a)
+                a: [] for a in ANCHORINGS if not self._anchorings.get(a)
             }
             fts = []
             for nc, child in enumerate(self._contains):
@@ -443,7 +508,10 @@ class Layer:
             if a in mapping.anchorings:
                 continue
             mapping.anchorings.append(a)
-        for anc_name, anc_val in self._anchorings.items():
+        for anc_name in ANCHORINGS:
+            if anc_name not in self._anchorings:
+                continue
+            anc_val = self._anchorings[anc_name]
             v = f"[{anc_val[0]},{anc_val[1]})"
             if anc_name == "location":
                 v = f"({anc_val[0]},{anc_val[1]}),({anc_val[2]},{anc_val[3]})"
@@ -475,6 +543,13 @@ class Layer:
         # All attributes
         if is_relation:
             rows = []
+            assert self._nested_set or mapping.nested_set_counter == 1, RuntimeError(
+                "All dependency layer instances must be made the same way: either by calling make statically, or by calling it on each instance."
+            )
+            if self._nested_set:
+                left_anchor, right_anchor = self._nested_set
+                rows.append(left_anchor)
+                rows.append(right_anchor)
         for aname, aopts in mapping.attributes.items():
             attr = self._attributes.get(aname, None)
             atype = aopts["type"]
@@ -626,7 +701,7 @@ class Attribute:
         elif isinstance(value, Layer):
             atype = "entity"
             self._ref = value._name
-        self._type = atype
+        self._type: str = atype
         layer._attributes[name] = self
 
 

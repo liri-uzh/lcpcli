@@ -624,7 +624,7 @@ class Document(EntityType):
 
 # Compute left/right from parent only once
 class NestedSet:
-    def __init__(self, id, label, cursor):
+    def __init__(self, id, label="", cursor=0):
         self.id = id
         self.children = []
         self.parent = None
