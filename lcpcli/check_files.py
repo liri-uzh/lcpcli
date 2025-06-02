@@ -26,7 +26,14 @@ def try_filename(path: str, no_ext: str) -> str:
 class Checker:
 
     def __init__(self, config, **kwargs):
-        csv.field_size_limit(sys.maxsize)
+        # hack to circumvent errors on windows (ref: https://stackoverflow.com/a/15063941)
+        maxInt = sys.maxsize
+        while True:
+            try:
+                csv.field_size_limit(maxInt)
+                break
+            except OverflowError:
+                maxInt = int(maxInt / 10)
         self.config = config
         self.token = config.get("firstClass", {}).get("token", "")
         self.segment = config.get("firstClass", {}).get("segment", "")
