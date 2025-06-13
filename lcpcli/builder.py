@@ -219,7 +219,7 @@ class Corpus:
                     is_token = layer_name == self._token
                     can_categorize = (
                         not (is_token and aname in ("form", "lemma"))
-                        and len(lookup) <= 50
+                        and len(lookup) <= 100
                         and all(len(v) < NAMEDATALEN for v in lookup)
                     )
                     if can_categorize:
