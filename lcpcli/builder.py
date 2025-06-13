@@ -577,7 +577,7 @@ class Layer:
                     for lab in val:
                         nlab = alookup.get(lab, None)
                         if nlab is None:
-                            nlab = len(alookup) + 1
+                            nlab = len(alookup)
                             mapping.csvs[aname].writerow([nlab, lab])
                         alookup[lab] = nlab
                         while len(bits) < nlab:
