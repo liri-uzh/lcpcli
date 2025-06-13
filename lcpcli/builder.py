@@ -572,18 +572,17 @@ class Layer:
             if atype in ATYPES_LOOKUP:
                 alookup = mapping.lookups[aname]
                 if atype == "labels":
-                    nlabels = int(aopts.get("nlabels", len(alookup)))
-                    bits = ["0" for _ in range(nlabels)]
+                    lab_ids = []
                     for lab in val:
                         nlab = alookup.get(lab, None)
                         if nlab is None:
                             nlab = len(alookup)
                             mapping.csvs[aname].writerow([nlab, lab])
                         alookup[lab] = nlab
-                        while len(bits) < nlab:
-                            bits.append("0")
-                        bits[nlab - 1] = "1"
+                        lab_ids.append(nlab)
+                    nlabels = int(aopts.get("nlabels", len(alookup)))
                     aopts["nlabels"] = len(alookup)
+                    bits = ["1" if n in lab_ids else "0" for n in range(nlabels)]
                     val = "".join(b for b in reversed(bits))
                 else:
                     lookupid = alookup.get(val, None)
