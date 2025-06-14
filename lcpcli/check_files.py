@@ -5,6 +5,7 @@ import sys
 
 from jsonschema import validate
 from re import match, findall
+from typing import Callable
 from uuid import UUID
 
 EXTENSIONS = (".csv", ".tsv")
@@ -330,7 +331,11 @@ class Checker:
         return None
 
     def check_existing_file(
-        self, filename: str, directory: str, add_zero: bool = False
+        self,
+        filename: str,
+        directory: str,
+        add_zero: bool = False,
+        callback: Callable | None = None,
     ) -> None:
         layer = self.config.get("layer", {})
         layer_name = ""
@@ -442,6 +447,8 @@ class Checker:
                 assert len(cols) == len(headers), SyntaxError(
                     f"Found {len(cols)} values on line {counter} in {filename}, expected {len(headers)}."
                 )
+                if callback:
+                    callback(cols, headers, filename, layer_name, self.config)
                 for n, col in enumerate(cols):
                     typ = columns[headers[n]]
                     if not col:
@@ -525,8 +532,18 @@ class Checker:
         return None
 
     def run_checks(
-        self, directory: str, full: bool = True, add_zero: bool = False
+        self,
+        directory: str,
+        full: bool = True,
+        add_zero: bool = False,
+        callback: Callable | None = None,
     ) -> None:
+        """
+        Check the headers of the files corresponding to the layers in directory
+        If full, also check each row
+        If add_zero, will use the suffix 0 when checking token and segment files
+        Callback will be run on each row (presupposes full)
+        """
         self.check_config()
         layer = self.config.get("layer", {})
         for layer_name, layer_properties in layer.items():
@@ -538,5 +555,5 @@ class Checker:
             if not filename.endswith(EXTENSIONS):
                 continue
             print(f"Checking file {filename}")
-            self.check_existing_file(filename, directory, add_zero)
+            self.check_existing_file(filename, directory, add_zero, callback)
         return None
