@@ -52,6 +52,7 @@ def lcp_upload(
     live: bool = False,
     provided_url: str = "",
     check_only: bool = False,
+    no_index: list[list[str]] = [],
     delimiter: str = "",
     quote: str = "",
     escape: str = "",
@@ -209,6 +210,7 @@ def lcp_upload(
     if provided_url:
         url = provided_url
     url = url.removesuffix("/") + "/create"
+    jso["no_index"] = no_index
     resp = post(url, headers=headers, json=jso)  # type: ignore
     data = resp.json()
     jso["quote"] = quote

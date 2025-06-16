@@ -101,14 +101,42 @@ then `lcpcli -c {output_path} -k $API_KEY -s $API_SECRET -p $PROJECT_NAME --live
         assert json_file, FileNotFoundError(
             f"Could not find a JSON configuration file in {self.kwargs['corpus']}"
         )
-        conf = loads(open(os.path.join(self.kwargs["corpus"], json_file), "r").read())
+        conf: dict[str, Any] = loads(
+            open(os.path.join(self.kwargs["corpus"], json_file), "r").read()
+        )
         checker = Checker(
             conf,
             quote=self.kwargs.get("quote") or '"',
             delimiter=self.kwargs.get("delimiter") or ",",
             escape=self.kwargs.get("escape") or None,
         )
-        checker.run_checks(self.kwargs["corpus"], full=True, add_zero=False)
+        text_attrs: list[tuple[str, str]] = [
+            (lay, attr)
+            for lay, props in conf["layer"].items()
+            for attr in {
+                aname
+                for aname, ameta in props.get("attributes", {}).items()
+                if ameta.get("type") == "text"
+            }
+        ]
+        no_index: set[tuple[str, str]] = set()
+        callback: Callable = lambda c, h, f, *_: no_index.add(
+            next(
+                (
+                    (lay, attr)
+                    for lay, attr in text_attrs
+                    if f.startswith(f"{lay}_{attr}.".lower())
+                    and len(c[h.index(attr.lower())]) > 2000
+                ),
+                ("", ""),
+            )
+        )
+        checker.run_checks(
+            self.kwargs["corpus"], full=True, add_zero=False, callback=callback
+        )
+        self.kwargs["no_index"] = [
+            [lay, attr] for lay, attr in no_index if lay and attr
+        ]
         return lcp_upload(**self._get_kwargs(lcp_upload))
 
 
