@@ -1,10 +1,25 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://liri.linguistik.uzh.ch/v1/lcp_corpus_template.json",
+    "$id": "https://liri.linguistik.uzh.ch/v2/lcp_corpus_template.json",
     "title": "LCP Corpus Template",
     "description": "Configuration of a corpus as represented in LCP",
     "type": "object",
     "$defs": {
+        "localizableString": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "object",
+                    "patternProperties": {
+                        ".+": {
+                            "type": "string"
+                        }
+                    }
+                }
+            ]
+        },
         "attribute": {
             "type": "object",
             "oneOf": [
@@ -35,6 +50,10 @@
                         "nlabels": {
                             "description": "The number of different labels for an attribute of type labels",
                             "type": "integer"
+                        },
+                        "description": {
+                            "description": "The description of the attribute",
+                            "$ref": "#/$defs/localizableString"
                         }
                     },
                     "required": [
@@ -84,11 +103,11 @@
             "properties": {
                 "name": {
                     "description": "The name of the corpus",
-                    "type": "string"
+                    "$ref": "#/$defs/localizableString"
                 },
                 "author": {
                     "description": "The author(s) of the corpus",
-                    "type": "string"
+                    "$ref": "#/$defs/localizableString"
                 },
                 "date": {
                     "description": "The date of the corpus",
@@ -100,7 +119,7 @@
                 },
                 "corpusDescription": {
                     "description": "The description of the corpus",
-                    "type": "string"
+                    "$ref": "#/$defs/localizableString"
                 },
                 "mediaSlots": {
                     "description": "Multimedia corpora need define at least one media slot",
