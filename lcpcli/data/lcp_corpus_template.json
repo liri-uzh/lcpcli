@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://liri.linguistik.uzh.ch/lcp_corpus_template.json",
+    "$id": "https://liri.linguistik.uzh.ch/v1/lcp_corpus_template.json",
     "title": "LCP Corpus Template",
     "description": "Configuration of a corpus as represented in LCP",
     "type": "object",
