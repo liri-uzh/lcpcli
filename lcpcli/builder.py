@@ -125,7 +125,8 @@ class Corpus:
         document: str = "Document",
         segment: str = "Segment",
         token: str = "Token",
-        author: str = "placeholder",
+        authors: str = "placeholder",
+        institution: str = "",
         description: str = "placeholder",
         date: str = "placeholder",
         version: int | float = 1,
@@ -140,7 +141,8 @@ class Corpus:
         self._files: dict[str, Any] = {}
         self._char_counter: int = 0
         self._global_attributes: dict[str, dict] = {}
-        self._author = author
+        self._authors = authors
+        self._institution = institution
         self._corpus_description = description
         self._date = date
         self._version = version
@@ -296,11 +298,11 @@ class Corpus:
         config: dict[str, Any] = {
             "meta": {
                 "name": self._name,
-                "author": self._author,
+                "authors": self._authors,
                 "corpusDescription": self._corpus_description,
                 "date": self._date,
-                "url": self._url,
-                "version": 1,
+                "source": self._source,
+                "revision": 1,
             },
             "firstClass": {
                 "token": self._token,
@@ -309,6 +311,8 @@ class Corpus:
             },
             "layer": {},
         }
+        if self._institution:
+            config["meta"]["institution"] = self._institution
         if self._license:
             config["meta"]["license"] = self._license
         if self._global_attributes:
