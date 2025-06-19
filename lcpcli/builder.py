@@ -148,6 +148,7 @@ class Corpus:
         self._version = version
         self._url = url
         self._license = license
+        self._upperFrameDocument = 0
 
     def _csv_writer(self, fn: str):
         tmp = tempfile.NamedTemporaryFile(
@@ -480,6 +481,9 @@ class Layer:
                     self_a = self._anchorings[a]
                     if child_a[0] < self_a[0]:
                         self_a[0] = child_a[0]
+                    if a == "time" and self._name == corpus._document:
+                        self_a[0] = corpus._upperFrameDocument
+                        corpus._upperFrameDocument = self_a[1]
                     if a != "location":
                         if child_a[1] > self_a[1]:
                             self_a[1] = child_a[1]
@@ -490,18 +494,22 @@ class Layer:
                         self_a[2] = child_a[2]
                     if child_a[3] > self_a[3]:
                         self_a[3] = child_a[3]
-                if not is_segment:
-                    continue
-                # FTS
-                fts.append(
+            if is_segment:
+                tokens = [
+                    ch._attributes.values()
+                    for ch in self._contains
+                    if ch._name == corpus._token
+                ]
+                fts = [
                     " ".join(
-                        f"'{na+1}{esc(attr._value)}':{nc+1}"
-                        for na, attr in enumerate(child._attributes.values())
+                        f"'{na+1}{esc(attr._value)}':{nt+1}"
+                        for na, attr in enumerate(attrs)
                         if attr._type in ("categorical", "text")
                     )
-                )
-            if fts:
-                mapping.csvs["_fts"].writerow([self._id, " ".join(fts)])
+                    for nt, attrs in enumerate(tokens)
+                ]
+                if fts:
+                    mapping.csvs["_fts"].writerow([self._id, " ".join(fts)])
         # occupy at least 1 char in the stream if anchored
         if not self._anchorings.get("stream") and self._in_stream():
             self._anchorings["stream"] = [
