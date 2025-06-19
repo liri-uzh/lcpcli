@@ -113,6 +113,10 @@
                     "description": "The date of the corpus",
                     "type": "string"
                 },
+                "url": {
+                    "description": "The source URL for the corpus",
+                    "type": "string"
+                },
                 "revision": {
                     "description": "The revision version of the corpus",
                     "type": "number"
@@ -152,7 +156,7 @@
                 "name",
                 "authors",
                 "date",
-                "version",
+                "revision",
                 "corpusDescription"
             ]
         },

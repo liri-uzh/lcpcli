@@ -129,7 +129,7 @@ class Corpus:
         institution: str = "",
         description: str = "placeholder",
         date: str = "placeholder",
-        version: int | float = 1,
+        revision: int | float = 1,
         url: str = "placeholder",
         license: str | None = None,
     ):
@@ -145,7 +145,7 @@ class Corpus:
         self._institution = institution
         self._corpus_description = description
         self._date = date
-        self._version = version
+        self._revision = revision
         self._url = url
         self._license = license
         self._upperFrameDocument = 0
@@ -302,7 +302,7 @@ class Corpus:
                 "authors": self._authors,
                 "corpusDescription": self._corpus_description,
                 "date": self._date,
-                "source": self._source,
+                "url": self._url,
                 "revision": 1,
             },
             "firstClass": {
@@ -462,11 +462,8 @@ class Layer:
             )
             self._anchorings["stream"] = [char_low, corpus._char_counter]
         elif self._contains:
-            unset_anchorings = {
-                a: [] for a in ANCHORINGS if not self._anchorings.get(a)
-            }
-            fts = []
-            for nc, child in enumerate(self._contains):
+            unset_anchorings = {a for a in ANCHORINGS if not self._anchorings.get(a)}
+            for child in self._contains:
                 child.make()
                 if child._name not in mapping.contains:
                     mapping.contains.append(child._name)
@@ -477,12 +474,12 @@ class Layer:
                     child_a = child._anchorings[a]
                     if a not in self._anchorings:
                         self._anchorings[a] = [*child_a]
-                        continue
                     self_a = self._anchorings[a]
                     if child_a[0] < self_a[0]:
                         self_a[0] = child_a[0]
                     if a == "time" and self._name == corpus._document:
-                        self_a[0] = corpus._upperFrameDocument
+                        if corpus._upperFrameDocument < self_a[0]:
+                            self_a[0] = corpus._upperFrameDocument
                         corpus._upperFrameDocument = self_a[1]
                     if a != "location":
                         if child_a[1] > self_a[1]:
