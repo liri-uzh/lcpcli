@@ -431,6 +431,17 @@ class Layer:
                 return True
         return False
 
+    def _children(self, recursive: False) -> list["Layer"]:
+        if not recursive:
+            return self._contains
+        ch: list[Layer] = []
+        for c in self._contains:
+            if c._contains:
+                ch += c._children(recursive=True)
+                continue
+            ch.append(c)
+        return ch
+
     def make(self):
         if self._made:
             return
@@ -494,7 +505,7 @@ class Layer:
             if is_segment:
                 tokens = [
                     ch._attributes.values()
-                    for ch in self._contains
+                    for ch in self._children(recursive=True)
                     if ch._name == corpus._token
                 ]
                 fts = [
