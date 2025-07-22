@@ -128,7 +128,7 @@ class Corpert:
                     )
                     continue
                 layer_attr_labels = {}
-                with open(layer_file, "r") as input:
+                with open(layer_file, "r", encoding="utf-8") as input:
                     found_comma = False
                     headers = []
                     while line := input.readline():
@@ -164,7 +164,7 @@ class Corpert:
                         print(
                             f"Warning: file {output_fn} already exists -- overwriting it"
                         )
-                    with open(output_fn, "w") as output:
+                    with open(output_fn, "w", encoding="utf-8") as output:
                         output.write(to_csv(["bit", "label"]))
                         for n, lab in enumerate(layer_attr_labels):
                             output.write(to_csv([str(n), lab]))
@@ -283,14 +283,14 @@ class Corpert:
         Create JSON file(s) depending on combine setting
         """
         if self._combine:
-            with open(self.output, "w") as fo:
+            with open(self.output, "w", encoding="utf-8") as fo:
                 json.dump(combined, fo, indent=4, sort_keys=False)
         else:
             for path, data in combined.items():
                 fixed_path = os.path.join(self.output, os.path.relpath(path))
                 if not os.path.isdir(os.path.dirname(fixed_path)):
                     os.makedirs(os.path.dirname(fixed_path))
-                with open(fixed_path, "w") as fo:
+                with open(fixed_path, "w", encoding="utf-8") as fo:
                     data = {path: data}
                     json.dump(data, fo, indent=4, sort_keys=False)
 
@@ -300,7 +300,7 @@ class Corpert:
         """
         if not os.path.exists(os.path.dirname(filename)):
             os.makedirs(os.path.dirname(filename))
-        with open(filename, "w") as fo:
+        with open(filename, "w", encoding="utf-8") as fo:
             fo.write(data)
 
     def _setup_filters(self):
@@ -319,7 +319,7 @@ class Corpert:
         """
         Run user's lua function on the JSON data for a file
         """
-        with open(self._lua_filter, "r") as fo:
+        with open(self._lua_filter, "r", encoding="utf-8") as fo:
             script = fo.read()
         func = self._lua.eval(script)
         return func(content)
@@ -328,7 +328,7 @@ class Corpert:
         """
         Run user's python function on the JSON data for a file
         """
-        with open(self._filter, "r") as fo:
+        with open(self._filter, "r", encoding="utf-8") as fo:
             script = fo.read()
         return exec(script, {}, {"content": content})
 
@@ -350,7 +350,7 @@ class Corpert:
         )
         if os.path.isfile(json_file):
             ignore_files.add(json_file)
-            with open(json_file, "r") as jsf:
+            with open(json_file, "r", encoding="utf-8") as jsf:
                 json_obj = json.loads(jsf.read())
         else:
             json_obj = default_json(
@@ -358,7 +358,7 @@ class Corpert:
             )
         parent_dir = os.path.dirname(__file__)
         schema_path = os.path.join(parent_dir, "data", "lcp_corpus_template.json")
-        with open(schema_path) as schema_file:
+        with open(schema_path, "r", encoding="utf-8") as schema_file:
             validate(json_obj, json.loads(schema_file.read()))
             print("validated json schema")
 
@@ -429,7 +429,7 @@ class Corpert:
                 f"Could not find a reference file for entity type '{layer}'"
             )
             ignore_files.add(layer_file)
-            with open(layer_file, "r") as f:
+            with open(layer_file, "r", encoding="utf-8") as f:
                 cols = [x.lower() for x in parse_csv(f.readline())]
                 for a in properties.get("attributes", {}):
                     assert a.lower() in cols, ReferenceError(
@@ -485,7 +485,7 @@ class Corpert:
             print(filepath)
             try:
                 # First pass: check that the file has some content
-                with open(filepath, "r") as f:
+                with open(filepath, "r", encoding="utf-8") as f:
                     has_content = False
                     while line := f.readline():
                         line = line.strip()
@@ -494,7 +494,7 @@ class Corpert:
                         has_content = True
                         break
                     assert has_content, AssertionError("No conllu lines to process")
-                with open(filepath, "r") as f:
+                with open(filepath, "r", encoding="utf-8") as f:
                     parser.generate_upload_files_generator(
                         f,
                         path=output_path,
@@ -525,8 +525,8 @@ class Corpert:
                 f"The output file '{output_fn}' already exists."
             )
             with (
-                open(os.path.join(self._path, fn), "r") as input_file,
-                open(output_fn, "w") as output_file,
+                open(os.path.join(self._path, fn), "r", encoding="utf-8") as input_file,
+                open(output_fn, "w", encoding="utf-8") as output_file,
             ):
                 while input_line := input_file.readline():
                     input_cols = parse_csv(input_line)
@@ -587,7 +587,7 @@ class Corpert:
         print(f"outfiles written to '{self.output}'.")
         json_str = json.dumps(json_obj, indent=4)
         json_path = os.path.join(output_path, "meta.json")
-        open(json_path, "w").write(json_str)
+        open(json_path, "w", encoding="utf-8").write(json_str)
         # print(f"\n{json_str}\n")
         print(
             f"A default meta.json file with the structure above was automatically generated at '{json_path}' for the current corpus."

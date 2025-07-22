@@ -102,7 +102,9 @@ then `lcpcli -c {output_path} -k $API_KEY -s $API_SECRET -p $PROJECT_NAME --live
             f"Could not find a JSON configuration file in {self.kwargs['corpus']}"
         )
         conf: dict[str, Any] = loads(
-            open(os.path.join(self.kwargs["corpus"], json_file), "r").read()
+            open(
+                os.path.join(self.kwargs["corpus"], json_file), "r", encoding="utf-8"
+            ).read()
         )
         checker = Checker(
             conf,

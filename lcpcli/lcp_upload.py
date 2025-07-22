@@ -151,7 +151,7 @@ def lcp_upload(
 
     if not template_data and template:
         print(f"Using template: {template}")
-        with open(template, "r") as fo:
+        with open(template, "r", encoding="utf-8") as fo:
             template_data = json.load(fo)
     # if delete_template:
     #    os.remove(template)
@@ -169,7 +169,7 @@ def lcp_upload(
         )
         doc_name = cast(dict, template_data)["firstClass"]["document"]
         doc_fn = get_file_from_base(doc_name, os.listdir(corpus))
-        with open(os.path.join(corpus, doc_fn), "r") as doc_file:
+        with open(os.path.join(corpus, doc_fn), "r", encoding="utf-8") as doc_file:
             media_ncol = -1
             doc_csv = csv.reader(
                 doc_file,

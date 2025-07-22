@@ -233,7 +233,7 @@ class Parser(abc.ABC):
         """
         ce_cols: list[str] = []
         # Read the content of the entity from the provided file
-        with open(fn, "r") as aligned_file:
+        with open(fn, "r", encoding="utf-8") as aligned_file:
             while sline := aligned_file.readline():
                 if not sline:
                     break
