@@ -479,7 +479,7 @@ class Table:
         assert not os.path.exists(self.path), FileExistsError(
             f"Output file '{self.path}' already exists."
         )
-        self.file = open(self.path, "w")
+        self.file = open(self.path, "w", encoding="utf-8")
         self.config = config
         self.cursor = 1
         self.current_entity = dict()
