@@ -657,9 +657,9 @@ def default_json(name):
     return {
         "meta": {
             "name": name,
-            "author": "Anonymous",
+            "authors": "Anonymous",
             "date": date.today().strftime("%Y-%m-%d"),
-            "version": 1,
+            "revision": 1,
             "corpusDescription": "",
         },
         "firstClass": {"document": "Document", "segment": "Segment", "token": "Token"},
