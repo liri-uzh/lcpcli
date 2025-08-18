@@ -1,9 +1,9 @@
 {
     "meta": {
         "name": "Free Single-Video Corpus",
-        "author": "LiRI",
+        "authors": "LiRI",
         "date": "2024-06-13",
-        "version": 1,
+        "revision": 1,
         "corpusDescription": "Single, open-source video with annotated shots and a placeholder text stream from the Universal Declaration of Human Rights annotated with named entities",
         "mediaSlots": {
             "video": {
