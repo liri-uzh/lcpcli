@@ -7,7 +7,7 @@
 Make sure you have python 3.11+ with `pip` installed in your local environment, then run:
 
 ```bash
-pip install lcpcli==0.2.5
+pip install lcpcli==0.2.6
 ```
 
 ## Usage
@@ -25,6 +25,8 @@ Data upload:
 ```bash
 lcpcli -c ~/upload/ -k $API_KEY -s $API_SECRET -p my_project --live
 ```
+
+Including `--live` points the upload to the live instance of LCP. Leave it out if you want to add a corpus to an instance of LCP running on `localhost`.
 
 **Help:**
 
