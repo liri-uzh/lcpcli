@@ -116,6 +116,8 @@ class CONLLUParser(Parser):
             elif re.match(r"\d+[\t\s]", line):
                 line = line.split("\t")
                 line = {k: v.strip() for k, v in zip(self._features, line)}
+                if not line.get("form"):
+                    continue
                 current_sentence["text"].append(line)
 
         if new_doc:

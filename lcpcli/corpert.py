@@ -584,6 +584,16 @@ class Corpert:
                         output_cols.append(f"[{start},{end})")
                     output_file.write(to_csv(output_cols))
 
+        # report nullable for empty categorical attributes
+        for properties in json_obj.get("layer", {}).values():
+            if "attributes" not in properties:
+                continue
+            for attrs in properties["attributes"].values():
+                if not attrs.get("type") == "categorical" or not attrs.get("values"):
+                    continue
+                if any(not x for x in attrs.get("values", [])):
+                    attrs["nullable"] = True
+
         print(f"outfiles written to '{self.output}'.")
         json_str = json.dumps(json_obj, indent=4)
         json_path = os.path.join(output_path, "meta.json")
