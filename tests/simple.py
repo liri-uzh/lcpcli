@@ -12,7 +12,7 @@ def create_corpus():
     shutil.rmtree(TMP_FOLDER)
     os.makedirs(TMP_FOLDER)
     c = Corpus(
-        "my test corpus", description="This is just a test corpus", author="Jeremy"
+        "my test corpus", description="This is just a test corpus", authors="Jeremy"
     )
     t1 = c.Token("hello")
     t2 = c.Token("world")

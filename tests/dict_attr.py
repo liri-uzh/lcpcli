@@ -13,10 +13,22 @@ def create_corpus():
     os.makedirs(TMP_FOLDER)
     c = Corpus("my test corpus")
     t1 = c.Token(
-        "hello", morph={"gender": "NA", "number": "NA", "mophemes": ["hel", "lo"]}
+        "hello",
+        morph={
+            "gender": "NA",
+            "number": "NA",
+            "mophemes": ["hel", "lo"],
+            "nsyllables": "2",
+        },
     )
     t2 = c.Token(
-        "world", morph={"gender": "NA", "number": "sg", "mophemes": ["wor", "ld"]}
+        "world",
+        morph={
+            "gender": "NA",
+            "number": "sg",
+            "mophemes": ["wor", "ld"],
+            "nsyllables": "1",
+        },
     )
     s1 = c.Segment(t1, t2)
     s1.make()

@@ -18,7 +18,7 @@ def create_corpus():
         {
             "firstname": "Jane",
             "lastname": "Doe",
-            "age": 35,
+            "age": "35",
             "gender": "f",
         }
     )
@@ -26,7 +26,7 @@ def create_corpus():
         {
             "firstname": "John",
             "lastname": "Doe",
-            "age": 35,
+            "age": "35",
             "gender": "m",
         }
     )

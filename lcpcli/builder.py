@@ -16,6 +16,22 @@ ANCHORINGS = ("stream", "time", "location")
 # ATYPES = ("text", "categorical", "number", "dict", "labels")
 ATYPES_LOOKUP = ("text", "dict", "labels")
 NAMEDATALEN = 63
+PATTERN_TXT = (
+    "(must start with a lower case and only contain alpha-numerical characters)"
+)
+
+
+def meta_subattr(meta: dict, k: str, v: Any) -> dict:
+    sub_attr = meta.setdefault(k, {})
+    if isinstance(v, list):
+        sub_attr["type"] = "labels"
+    elif isinstance(v, (int, float)) or isinstance(v, str) and v.isdigit():
+        sub_attr["type"] = "text" if sub_attr.get("type") == "text" else "number"
+    elif isinstance(v, dict):
+        sub_attr["type"] = "dict"
+    else:
+        sub_attr["type"] = "text"
+    return meta
 
 
 def get_layer_method(layer: "Layer"):
@@ -388,7 +404,9 @@ class Layer:
         if name.startswith("_"):
             super().__setattr__(name, value)
         else:
-            assert re.match(r"[a-z][a-zA-Z0-9]+", name), RuntimeError()
+            assert re.match(r"[a-z][a-zA-Z0-9_]+$", name), RuntimeError(
+                f"The attribute '{name}' on the layer {self._name} does not match the pattern {PATTERN_TXT}"
+            )
             Attribute(self, name, value)
 
     def __getattribute__(self, name: str):
@@ -614,15 +632,7 @@ class Layer:
             if atype == "dict":
                 keys = mapping.attributes[aname].setdefault("keys", {})
                 for k, v in json.loads(attr._value).items():
-                    if k in keys:
-                        continue
-                    keys[k] = {
-                        "type": (
-                            "dict"
-                            if isinstance(v, dict)
-                            else ("number" if isinstance(v, (int, float)) else "text")
-                        )
-                    }
+                    meta_subattr(keys, k, v)
             if val is None:
                 val = ""
             elif val in (True, False):
@@ -728,29 +738,23 @@ class Attribute:
 class GlobalAttribute:
     def __init__(self, corpus: Corpus, name: str, value: dict = {}):
         self._name = name
-        value = {
-            k: ",".join(x for x in v) if isinstance(v, (list, set)) else v
-            for k, v in value.items()
-        }
-        self._value = value
         if name not in corpus._global_attributes:
             lname = name.lower()
             csv_writer = corpus._csv_writer(f"global_attribute_{lname}.csv")
             csv_writer.writerow([f"{lname}_id", lname])
-            corpus._global_attributes[name] = {
-                "csv": csv_writer,
-                "ids": {},
-                "keys": {
-                    k: {
-                        "type": (
-                            "dict"
-                            if isinstance(v, dict)
-                            else ("number" if isinstance(v, (int, float)) else "text")
-                        )
-                    }
-                    for k, v in value.items()
-                },
-            }
+            corpus._global_attributes[name] = {"csv": csv_writer, "ids": {}, "keys": {}}
+        keys: dict = {}
+        for k, v in value.items():
+            assert re.match(r"[a-z][a-zA-Z0-9_]+$", k), RuntimeError(
+                f"The sub-attribute '{k}' on the global attribute {name} does not match the pattern {PATTERN_TXT}"
+            )
+            keys[k] = list(v) if isinstance(v, set) else v
+            # value = {
+            #     k: ",".join(x for x in v) if isinstance(v, (list, set)) else v
+            #     for k, v in value.items()
+            # }
+            meta_subattr(corpus._global_attributes[name]["keys"], k, v)
+        self._value = keys
         mapping = corpus._global_attributes[name]
         self._id = str(value.get("id", len(mapping["ids"]) + 1))
         mapping["ids"][self._id] = 1
