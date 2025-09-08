@@ -7,7 +7,7 @@
 Make sure you have python 3.11+ with `pip` installed in your local environment, then run:
 
 ```bash
-pip install lcpcli==0.2.6
+pip install lcpcli==0.2.7
 ```
 
 ## Usage
