@@ -561,6 +561,26 @@ class Checker:
                 assert not layer or first_class[key] in layer, ReferenceError(
                     f"layer must contain the key '{first_class[key]}' defined for {key}"
                 )
+        if tracks := self.config.get("tracks", {}):
+            for track, split in tracks.get("layers", {}).items():
+                assert track in self.config.get("layer", {}), ReferenceError(
+                    f"The tracks reference a layer named '{track}' which is not defined under 'layer'."
+                )
+                layer_attrs = self.config["layer"][track].get("attributes", {})
+                if isinstance(layer_attrs.get("meta"), dict):
+                    layer_attrs.update(layer_attrs["meta"])
+                assert isinstance(split, dict), TypeError(
+                    f"The values associated with the layer names under 'tracks' must be key-value pairs."
+                )
+                for x in split.get("split", []):
+                    assert x in layer_attrs, ReferenceError(
+                        f"'tracks' specifies to split '{track}' by '{x}' but no attribute of that named is reported for that layer."
+                    )
+            glob_attrs = self.config.get("globalAttributes", {})
+            for group_by in tracks.get("group_by", []):
+                assert group_by in glob_attrs, ReferenceError(
+                    f"'tracks' specifies to group lines by '{group_by}' but no global attribute of that name was defined."
+                )
         parent_dir = os.path.dirname(__file__)
         schema_path = os.path.join(parent_dir, "data", "lcp_corpus_template.json")
         with open(schema_path, "r", encoding="utf-8") as schema_file:

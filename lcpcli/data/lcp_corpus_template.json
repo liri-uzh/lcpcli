@@ -94,6 +94,20 @@
                 "name",
                 "entity"
             ]
+        },
+        "track": {
+            "type": "object",
+            "patternProperties": {
+                "^[A-Z][a-zA-Z0-9_]+$": {
+                    "type": "object",
+                    "properties": {
+                        "split": {
+                            "type": "array",
+                            "description": "There will be one line in the timeline for each attribute value listed here."
+                        }
+                    }
+                }
+            }
         }
     },
     "properties": {
@@ -344,6 +358,20 @@
             "additionalProperties": {
                 "type": "object",
                 "$ref": "#/$defs/attribute"
+            }
+        },
+        "tracks": {
+            "type": "object",
+            "properties": {
+                "layers": {
+                    "type": "object",
+                    "$ref": "#/$defs/track",
+                    "description": "The layers to display on the timeline."
+                },
+                "group_by": {
+                    "type": "array",
+                    "description": "The lines in the timeline will be grouped according to the global attribute(s) listed here."
+                }
             }
         }
     },
