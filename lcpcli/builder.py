@@ -25,7 +25,11 @@ def meta_subattr(meta: dict, k: str, v: Any) -> dict:
     sub_attr = meta.setdefault(k, {})
     if isinstance(v, list):
         sub_attr["type"] = "labels"
-    elif isinstance(v, (int, float)) or isinstance(v, str) and v.isdigit():
+    elif (
+        isinstance(v, (int, float))
+        or isinstance(v, str)
+        and v.replace(".", "", 1).isdigit()
+    ):
         sub_attr["type"] = "text" if sub_attr.get("type") == "text" else "number"
     elif isinstance(v, dict):
         sub_attr["type"] = "dict"
@@ -718,7 +722,7 @@ class Attribute:
         elif isinstance(value, dict):
             atype = "dict"
             value = {
-                k: ",".join(x for x in v) if isinstance(v, (list, set)) else v
+                k: list(str(x) for x in v) if isinstance(v, (list, set)) else v
                 for k, v in value.items()
             }
             self._value = json.dumps(sorted_dict(value))

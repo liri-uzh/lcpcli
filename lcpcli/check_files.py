@@ -55,14 +55,20 @@ class Checker:
 
     def get_attribute_columns(
         self, attrs: dict[str, dict]
-    ) -> dict[str, tuple[str, str]]:
+    ) -> dict[str, tuple[str, str, dict | None]]:
         ret = {}
         for aname, aprops in attrs.items():
             self.check_attribute_name(aname)
             lookup = is_lookup(aprops)
             acol = f"{aname}_id" if lookup else aname
             typ = "lookup" if lookup else aprops.get("type", "")
-            ret[aname] = (acol, typ)
+            subtyps = None
+            if aname == "meta":
+                typ = "dict"
+                subtyps = aprops
+            elif aprops.get("type") == "dict":
+                subtyps = {k: v.get("type") for k, v in aprops.get("keys", {}).items()}
+            ret[aname] = (acol, typ, subtyps)
         return ret
 
     def is_anchored(self, layer: str, anchor: str) -> bool:
@@ -85,9 +91,30 @@ class Checker:
             f"Categorical value '{value}' is not in the listed values"
         )
 
-    def check_dict(self, str_obj: str) -> None:
+    def check_dict(self, str_obj: str, subtyps: dict) -> None:
         try:
             json_obj = json.loads(str_obj)
+            assert isinstance(json_obj, dict), TypeError(
+                f"Not a valid dict ({str_obj})"
+            )
+            for k, v in json_obj.items():
+                typ = subtyps.get(k)
+                if not typ:
+                    continue
+                if typ == "number":
+                    assert (
+                        isinstance(v, (int, float))
+                        or isinstance(v, str)
+                        and v.replace(".", "", 1).isdigit()
+                    ), TypeError(f"Sub-attribute {k} is not a number ({v})")
+                elif typ in ("labels", "array"):
+                    assert isinstance(v, list), TypeError(
+                        f"Sub-attribute {k} is not an array ({v})"
+                    )
+                elif typ in ("categorical", "text"):
+                    assert isinstance(v, str), TypeError(
+                        f"Sub-attribute {k} is not a valid text value ({v})"
+                    )
         except:
             json_obj = None
         assert isinstance(json_obj, dict), SyntaxError(
@@ -313,7 +340,7 @@ class Checker:
                     assert f"{segment_layer.lower()}_id" in header, ReferenceError(
                         f"Column '{segment_layer.lower()}_id' missing from file {filename} for token-level layer {layer_name}"
                     )
-            for aname, (acol, typ) in columns.items():
+            for aname, (acol, typ, _) in columns.items():
                 if is_relation and aname in ("source", "target"):
                     continue
                 assert acol in header, ReferenceError(
@@ -341,7 +368,8 @@ class Checker:
         layer_name = ""
         nullables = set()
         no_ext, *_ = os.path.splitext(filename)
-        columns = {}
+        columns: dict[str, str] = {}
+        subtyps: dict = {}
         if no_ext.startswith("global_attribute_"):
             aname = no_ext[17:].lower()
             props = self.config.get("globalAttributes", {}).get(aname)
@@ -349,6 +377,9 @@ class Checker:
                 f"No correpsonding global attribute defined in the configuration for file {filename}"
             )
             columns = {f"{aname}_id": "lookup", aname: "dict"}
+            subtyps[aname] = {
+                k: v.get("type") for k, v in props.get("keys", {}).items()
+            }
             nullables.add(aname)
         elif no_ext == "fts_vector" or (add_zero and no_ext == "fts_vector0"):
             columns = {
@@ -387,6 +418,9 @@ class Checker:
                 columns = {f"{aname}_id": "lookup", aname: typ}
                 if aprops.get("nullable"):
                     nullables.add(aname)
+                subtyps[aname] = {
+                    k: v.get("type") for k, v in aprops.get("keys", {}).items()
+                }
         else:
             layer_name = next(
                 (l for l in layer.keys() if l.lower() == no_ext.lower()), ""
@@ -402,8 +436,11 @@ class Checker:
             props = layer[layer_name]
             attrs = props.get("attributes", {})
             columns = {}
-            for aname, (col_name, typ) in self.get_attribute_columns(attrs).items():
+            for aname, (col_name, typ, subt) in self.get_attribute_columns(
+                attrs
+            ).items():
                 columns[col_name] = typ
+                subtyps[col_name] = subt
                 if attrs[aname].get("nullable"):
                     nullables.add(col_name)
             if props.get("layerType", "") == "relation":
@@ -466,7 +503,7 @@ class Checker:
                     else:
                         try:
                             if typ == "dict":
-                                self.check_dict(col)
+                                self.check_dict(col, subtyps.get(headers[n], {}))
                             elif typ == "labels":
                                 assert layer_name, NotImplementedError(
                                     f"Attributes of type 'labels' are only supported on layers ({filename})"
@@ -488,7 +525,7 @@ class Checker:
                                 self.check_ftsvector(col)
                             elif typ == "categorical":
                                 assert layer_name, NotImplementedError(
-                                    f"Attributes of type 'categofical' are only supported on layers ({filename})"
+                                    f"Attributes of type 'categorical' are only supported on layers ({filename})"
                                 )
                                 aprops = (
                                     layer[layer_name]

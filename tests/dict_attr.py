@@ -17,7 +17,7 @@ def create_corpus():
         morph={
             "gender": "NA",
             "number": "NA",
-            "mophemes": ["hel", "lo"],
+            "morphemes": ["hel", "lo"],
             "nsyllables": "2",
         },
     )
@@ -26,15 +26,15 @@ def create_corpus():
         morph={
             "gender": "NA",
             "number": "sg",
-            "mophemes": ["wor", "ld"],
+            "morphemes": ["wor", "ld"],
             "nsyllables": "1",
         },
     )
     s1 = c.Segment(t1, t2)
     s1.make()
-    t3 = c.Token("bye", morph={"gender": "NA", "number": "NA", "mophemes": []})
+    t3 = c.Token("bye", morph={"gender": "NA", "number": "NA", "morphemes": []})
     t4 = c.Token(
-        "world", morph={"gender": "NA", "number": "sg", "mophemes": ["wor", "ld"]}
+        "world", morph={"gender": "NA", "number": "sg", "morphemes": ["wor", "ld"]}
     )
     s2 = c.Segment(t3, t4)
     s2.make()
