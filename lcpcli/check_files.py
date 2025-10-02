@@ -234,11 +234,11 @@ class Checker:
         )
         with open(fpath, "r", encoding="utf-8") as afile:
             header = self.parseline(afile.readline())
-            assert f"{attribute_low}_id" in header, ReferenceError(
-                f"Column {attribute_low}_id missing from file {filename} for attribute '{attribute_name}' of type {typ} for layer {layer_name}"
+            assert f"{attribute_name}_id" in header, ReferenceError(
+                f"Column {attribute_name}_id missing from file {filename} for attribute '{attribute_name}' of type {typ} for layer {layer_name}"
             )
-            assert attribute_low in header, ReferenceError(
-                f"Column {attribute_low} missing from file {filename} for attribute '{attribute_name}' of type {typ} for layer {layer_name}"
+            assert attribute_name in header, ReferenceError(
+                f"Column {attribute_name} missing from file {filename} for attribute '{attribute_name}' of type {typ} for layer {layer_name}"
             )
         return None
 
@@ -371,7 +371,7 @@ class Checker:
         columns: dict[str, str] = {}
         subtyps: dict = {}
         if no_ext.startswith("global_attribute_"):
-            aname = no_ext[17:].lower()
+            aname = no_ext[17:]  # .lower()
             props = self.config.get("globalAttributes", {}).get(aname)
             assert props, ReferenceError(
                 f"No correpsonding global attribute defined in the configuration for file {filename}"
@@ -395,13 +395,13 @@ class Checker:
             assert props, ReferenceError(
                 f"No corresponding layer found for file {filename}"
             )
-            aprops = next(
+            aname, aprops = next(
                 (
-                    v
+                    (k, v)
                     for k, v in props.get("attributes", {}).items()
                     if k.lower() == aname.lower()
                 ),
-                None,
+                (aname, None),
             )
             assert aprops, ReferenceError(
                 f"Found a file named {filename} but the configuration defines no such attribute for that layer"

@@ -128,7 +128,7 @@ then `lcpcli -c {output_path} -k $API_KEY -s $API_SECRET -p $PROJECT_NAME --live
                     (lay, attr)
                     for lay, attr in text_attrs
                     if f.startswith(f"{lay}_{attr}.".lower())
-                    and len(c[h.index(attr.lower())]) > 2000
+                    and len(c[h.index(attr)]) > 2000
                 ),
                 ("", ""),
             )
