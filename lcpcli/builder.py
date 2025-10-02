@@ -581,8 +581,7 @@ class Layer:
                     if atype == "labels":
                         mapping.csvs[aname].writerow(["bit", "label"])
                     else:
-                        anamelow = aname.lower()
-                        mapping.csvs[aname].writerow([f"{anamelow}_id", anamelow])
+                        mapping.csvs[aname].writerow([f"{aname}_id", aname])
         # All attributes
         if is_relation:
             rows = []
