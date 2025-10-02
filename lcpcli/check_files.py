@@ -203,8 +203,8 @@ class Checker:
         return None
 
     def check_attribute_name(self, name: str) -> None:
-        assert name == name.lower(), SyntaxError(
-            f"Attribute name '{name}' cannot contain uppercase characters"
+        assert name[0] == name[0].lower(), SyntaxError(
+            f"Attribute name '{name}' cannot start with an uppercase character"
         )
         assert " " not in name, SyntaxError(
             f"Attribute name '{name}' cannot contain whitespace characters"
