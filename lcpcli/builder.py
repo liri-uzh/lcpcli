@@ -371,7 +371,7 @@ class Corpus:
                 if ais_global:
                     aopts["isGlobal"] = True
                 if aopts["type"] == "categorical" and not ais_global:
-                    aopts["values"] = [v for v in mapping.lookups[aname]]
+                    aopts["values"] = [v for v in mapping.lookups[aname] if v]
                 elif aopts["type"] == "ref":
                     aopts.pop("type")
                     aopts.pop("nullable", "")
