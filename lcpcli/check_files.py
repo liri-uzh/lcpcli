@@ -566,7 +566,12 @@ class Checker:
                 assert track in self.config.get("layer", {}), ReferenceError(
                     f"The tracks reference a layer named '{track}' which is not defined under 'layer'."
                 )
-                layer_attrs = self.config["layer"][track].get("attributes", {})
+                layer_attrs = {
+                    k: v
+                    for k, v in self.config["layer"][track]
+                    .get("attributes", {})
+                    .items()
+                }
                 if isinstance(layer_attrs.get("meta"), dict):
                     layer_attrs.update(layer_attrs["meta"])
                 assert isinstance(split, dict), TypeError(
