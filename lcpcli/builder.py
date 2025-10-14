@@ -22,6 +22,9 @@ PATTERN_TXT = (
 
 
 def meta_subattr(meta: dict, k: str, v: Any) -> dict:
+    """
+    Set the type of the sub-attribute k of value v in meta
+    """
     sub_attr = meta.setdefault(k, {})
     if isinstance(v, list):
         sub_attr["type"] = "labels"
@@ -382,6 +385,8 @@ class Corpus:
                         aname_in_conf = "target"
                     else:
                         aname_in_conf = "source"
+                if aname == "meta" and aopts["type"] == "dict":
+                    toconf["hasMeta"] = True
                 toconf["attributes"][aname_in_conf] = aopts
             if mapping.nested_set_counter > 1:
                 toconf["attributes"]["left_anchor"] = {"type": "number"}
@@ -610,7 +615,7 @@ class Layer:
                     f"Entity referenced in relation layer {self._name} not made yet ({val})"
                 )
                 val = val._id
-            if atype in ATYPES_LOOKUP:
+            if atype in ATYPES_LOOKUP and (aname != "meta" or atype != "dict"):
                 alookup = mapping.lookups[aname]
                 if atype == "labels":
                     lab_ids = []
@@ -634,6 +639,10 @@ class Layer:
                     val = lookupid
             if atype == "dict":
                 keys = mapping.attributes[aname].setdefault("keys", {})
+                if aname == "meta":
+                    # the special 'meta' attribute lists its sub-attributes directly
+                    keys = mapping.attributes[aname]
+                    mapping.attributes[aname].pop("keys", None)
                 for k, v in json.loads(attr._value).items():
                     meta_subattr(keys, k, v)
             if val is None:

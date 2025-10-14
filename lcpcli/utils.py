@@ -104,8 +104,9 @@ class CustomDict:
 
 
 class SpillDict:
-    max_in_memory_items = 59999999
+    max_in_memory_items = 29999999
     overall_size = 0
+    reached = False
 
     def __init__(self):
         self.in_memory = {}
@@ -127,6 +128,9 @@ class SpillDict:
         if SpillDict.overall_size < SpillDict.max_in_memory_items:
             self.in_memory[key] = value
         else:
+            if not SpillDict.reached:
+                print("Reached the limit, using disk storage now")
+                SpillDict.reached = True
             self.dc[key] = value
         self.size += 1
         SpillDict.overall_size += 1
