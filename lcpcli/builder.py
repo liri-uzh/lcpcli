@@ -10,7 +10,7 @@ import shutil
 from typing import Any
 from uuid import uuid4
 
-from .utils import esc, sorted_dict, NestedSet
+from .utils import esc, sorted_dict, SpillDict, NestedSet
 
 ANCHORINGS = ("stream", "time", "location")
 # ATYPES = ("text", "categorical", "number", "dict", "labels")
@@ -574,7 +574,7 @@ class Layer:
                 mapping.attributes[aname]["ref"] = attr._ref.lower()
             elif atype in ATYPES_LOOKUP:
                 if aname not in mapping.lookups:
-                    mapping.lookups[aname] = {}
+                    mapping.lookups[aname] = SpillDict()
                 if aname not in mapping.csvs:
                     fn = f"{self._name.lower()}_{aname.lower()}.csv"
                     mapping.csvs[aname] = corpus._csv_writer(fn)

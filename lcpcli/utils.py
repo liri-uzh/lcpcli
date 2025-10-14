@@ -1,8 +1,10 @@
 import csv
+import diskcache
 import io
 import json
 import os
 import re
+import tempfile
 import uuid
 
 from datetime import date
@@ -99,6 +101,92 @@ class CustomDict:
 
     def get(self, value):
         return self._dictionary.get(value, None)
+
+
+class SpillDict:
+    max_in_memory_items = 59999999
+    overall_size = 0
+
+    def __init__(self):
+        self.in_memory = {}
+        self.tmpfile = tempfile.NamedTemporaryFile()
+        self.dc = diskcache.Cache(self.tmpfile)
+        self.size = 0
+
+    def __del__(self):
+        if os.path.exists(self.tmpfile.name):
+            os.remove(self.tmpfile.name)
+
+    def __setitem__(self, key, value):
+        if key in self.in_memory:
+            self.in_memory[key] = value
+            return
+        if self.dc and key in self.dc:
+            self.dc[key] = value
+            return
+        if SpillDict.overall_size < SpillDict.max_in_memory_items:
+            self.in_memory[key] = value
+        else:
+            self.dc[key] = value
+        self.size += 1
+        SpillDict.overall_size += 1
+
+    def __getitem__(self, key):
+        if key in self.in_memory:
+            return self.in_memory[key]
+        else:
+            return self.dc[key]
+
+    def __eq__(self, other):
+        if not isinstance(other, SpillDict):
+            return False
+        return self == other
+
+    def __len__(self):
+        return self.size
+
+    def __bool__(self):
+        return self.size > 0
+
+    def __contains__(self, key) -> bool:
+        return key in self.in_memory or key in self.dc
+
+    def __iter__(self):
+        for k in self.in_memory:
+            yield k
+        for k in self.dc:
+            yield k
+
+    def items(self):
+        for k in self.in_memory:
+            yield (k, self.in_memory[k])
+        for k in self.dc:
+            yield (k, self.dc[k])
+
+    def setdefault(self, key, value):
+        if key not in self.in_memory and key not in self.dc:
+            self.__setitem__(key, value)
+        return self.__getitem__(key)
+
+    def keys(self):
+        for k in self.in_memory:
+            yield k
+        for k in self.dc:
+            yield k
+
+    def values(self):
+        for k in self.in_memory:
+            yield self.in_memory[k]
+        for k in self.dc:
+            yield self.dc[k]
+
+    def get(self, key: str, default=None):
+        val = default
+        try:
+            val = self.__getitem__(key)
+        except:
+            pass
+        return val
 
 
 class NestedSetTreeStructure:
