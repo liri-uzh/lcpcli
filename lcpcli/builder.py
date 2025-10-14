@@ -1,6 +1,7 @@
 # TODO: left_anchor and right_anchor in relation layers
 
 import csv
+import duckdb
 import json
 import os
 import re
@@ -128,7 +129,7 @@ class LayerMapping:
             self.csvs["_fts"] = corpus._csv_writer(f"fts_vector.csv")
             self.csvs["_fts"].writerow([f"{lname}_id", "vector"])
         self.attributes: dict[str, Any] = {}
-        self.lookups: dict[str, Any] = {}
+        self.lookups: dict[str, int] = {}
         self.counter = 0
         self.nested_set_counter: int = 1
         self.contains: list[str] = []
@@ -169,6 +170,7 @@ class Corpus:
         self._url = url
         self._license = license
         self._upperFrameDocument = 0
+        self._duck = duckdb.connect(":memory:")
 
     def _csv_writer(self, fn: str):
         tmp = tempfile.NamedTemporaryFile(
@@ -235,15 +237,18 @@ class Corpus:
                 mapping.attributes.items(), start=len(headers)
             ):
                 atype = aopts["type"]
-                lookup = {}
-                if atype in ATYPES_LOOKUP:
-                    lookup = mapping.lookups[aname]
+                # lookup = {}
+                # if atype in ATYPES_LOOKUP:
+                #     lookup = mapping.lookups[aname]
                 if atype == "text":
                     is_token = layer_name == self._token
+                    can_categorize_sql = self._duck.sql(
+                        f"SELECT COUNT(*) <= 100 AND min(len(value) < {NAMEDATALEN}) FROM {layer_name}.{aname};"
+                    ).fetchall()
                     can_categorize = (
                         not (is_token and aname in ("form", "lemma"))
-                        and len(lookup) <= 100
-                        and all(len(v) < NAMEDATALEN for v in lookup)
+                        and can_categorize_sql
+                        and can_categorize_sql[0][0]
                     )
                     if can_categorize:
                         texts_to_categorical[na] = aname
@@ -251,7 +256,8 @@ class Corpus:
                     else:
                         headers.append(f"{aname}_id")
                 elif atype == "labels":
-                    labels[na] = len(lookup)
+                    # labels[na] = len(lookup)
+                    labels[na] = mapping.lookups[aname]
                     headers.append(aname)
                 elif atype in ATYPES_LOOKUP or atype == "ref":
                     headers.append(f"{aname}_id")
@@ -272,14 +278,23 @@ class Corpus:
                         if aopts["type"] not in ("text", "dict"):
                             row.append("")
                             continue
-                        lookup = mapping.lookups[aname]
+                        # lookup = mapping.lookups[aname]
                         lookupval: Any = (
                             "" if aopts["type"] == "text" else json.dumps(dict({}))
                         )
-                        lookupid: int | None = lookup.get(lookupval, None)
-                        if lookupid is None:
-                            lookupid = len(lookup) + 1
-                            lookup[lookupval] = lookupid
+                        # lookupid: int | None = lookup.get(lookupval, None)
+                        dtab = f"{layer_name}.{aname}"
+                        lookupidsql = self._duck.sql(
+                            f"SELECT id FROM {dtab} WHERE value = '{lookupval}';"
+                        ).fetchall()
+                        if lookupidsql:
+                            lookupid = lookupidsql[0][0]
+                        else:
+                            lookupid = mapping.lookups[aname]
+                            self._duck.execute(
+                                f"INSERT INTO {dtab} (id, value) VALUES ({lookupid}, '{lookupval}');"
+                            )
+                            mapping.lookups[aname] = lookupid + 1
                             mapping.csvs[aname].writerow([lookupid, lookupval])
                         row.append(str(lookupid))
                     # optimize each column that needs to be optimized
@@ -292,7 +307,9 @@ class Corpus:
                             aname = texts_to_categorical[nc]
                             row[nc] = next(
                                 k
-                                for k, v in mapping.lookups[aname].items()
+                                for k, v in self._duck.sql(
+                                    f"SELECT id, value FROM {layer_name}.{aname};"
+                                ).fetchall()
                                 if str(v) == val
                             )
                     csv_writer.writerow(row)
@@ -371,7 +388,13 @@ class Corpus:
                 if ais_global:
                     aopts["isGlobal"] = True
                 if aopts["type"] == "categorical" and not ais_global:
-                    aopts["values"] = [v for v in mapping.lookups[aname] if v]
+                    aopts["values"] = [
+                        v
+                        for v, *_ in self._duck.sql(
+                            f"SELECT value FROM {layer}.{aname};"
+                        ).fetchall()
+                        if v
+                    ]
                 elif aopts["type"] == "ref":
                     aopts.pop("type")
                     aopts.pop("nullable", "")
@@ -453,7 +476,7 @@ class Layer:
                 return True
         return False
 
-    def _children(self, recursive: False) -> list["Layer"]:
+    def _children(self, recursive: False) -> list["Layer"]:  # type: ignore
         if not recursive:
             return self._contains
         ch: list[Layer] = []
@@ -574,7 +597,15 @@ class Layer:
                 mapping.attributes[aname]["ref"] = attr._ref.lower()
             elif atype in ATYPES_LOOKUP:
                 if aname not in mapping.lookups:
-                    mapping.lookups[aname] = {}
+                    if not mapping.lookups:
+                        self._corpus._duck.execute(f"CREATE SCHEMA {self._name};")
+                    self._corpus._duck.execute(
+                        f"CREATE TABLE {self._name}.{aname} (id INTEGER PRIMARY KEY, value VARCHAR);"
+                    )
+                    self._corpus._duck.execute(
+                        f"CREATE UNIQUE INDEX {self._name}_{aname}_idx ON {self._name}.{aname} (value);"
+                    )
+                    mapping.lookups[aname] = 1
                 if aname not in mapping.csvs:
                     fn = f"{self._name.lower()}_{aname.lower()}.csv"
                     mapping.csvs[aname] = corpus._csv_writer(fn)
@@ -611,27 +642,45 @@ class Layer:
                 )
                 val = val._id
             if atype in ATYPES_LOOKUP:
-                alookup = mapping.lookups[aname]
+                nlookup = mapping.lookups[aname]
+                dtab = f"{self._name}.{aname}"
                 if atype == "labels":
                     lab_ids = []
                     for lab in val:
-                        nlab = alookup.get(lab, None)
-                        if nlab is None:
-                            nlab = len(alookup)
+                        # nlab = alookup.get(lab, None)
+                        dlab = lab.replace("'", "''")
+                        nlab = self._corpus._duck.sql(
+                            f"SELECT id FROM {dtab} WHERE value = '{dlab}';",
+                        ).fetchall()
+                        if not nlab:
+                            dlab = lab.replace("'", "''")
+                            self._corpus._duck.execute(
+                                f"INSERT INTO {dtab} (id,value) VALUES ({nlookup}, '{dlab}')"
+                            )
+                            nlab = nlookup + 1
+                            mapping.lookups[aname] = nlab
                             mapping.csvs[aname].writerow([nlab, lab])
-                        alookup[lab] = nlab
+                        else:
+                            nlab = nlab[0][0]
                         lab_ids.append(nlab)
-                    nlabels = int(aopts.get("nlabels", len(alookup)))
-                    aopts["nlabels"] = len(alookup)
+                    nlabels = int(aopts.get("nlabels", nlookup))
+                    aopts["nlabels"] = nlabels
                     bits = ["1" if n in lab_ids else "0" for n in range(nlabels)]
                     val = "".join(b for b in reversed(bits))
                 else:
-                    lookupid = alookup.get(val, None)
-                    if lookupid is None:
-                        lookupid = len(alookup) + 1
-                        alookup[val] = lookupid
-                        mapping.csvs[aname].writerow([lookupid, val])
-                    val = lookupid
+                    dval = val.replace("'", "''")
+                    lookupidsql = self._corpus._duck.sql(
+                        f"SELECT id FROM {dtab} WHERE value = '{dval}';",
+                    ).fetchall()
+                    if lookupidsql:
+                        val = lookupidsql[0][0]
+                    else:
+                        self._corpus._duck.execute(
+                            f"INSERT INTO {dtab} (id,value) VALUES ({nlookup}, '{dval}')"
+                        )
+                        mapping.csvs[aname].writerow([nlookup, val])
+                        val = nlookup
+                        mapping.lookups[aname] = nlookup + 1
             if atype == "dict":
                 keys = mapping.attributes[aname].setdefault("keys", {})
                 for k, v in json.loads(attr._value).items():
