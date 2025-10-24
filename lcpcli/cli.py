@@ -97,28 +97,36 @@ def _parse_cmd_line():
         help="JSON template filepath or raw JSON string. If not provided, the first JSON file found in the corpus data will be used.",
     )
     parser.add_argument(
-        "-l",
-        "--live",
-        required=False,
-        default=False,
-        help="Use live system? If false, use test system.",
-        **BOOL_KWARGS,
-    )
-    parser.add_argument(
         "-r",
         "--url",
         type=str,
         required=False,
         help="URL of the LCP instance receiving the corpus.",
     )
-    parser.add_argument(
-        "-ch",
-        "--check-only",
-        required=False,
-        default=False,
-        help="Run the pre-import check without importing.",
-        **BOOL_KWARGS,
-    )
+    while 1:
+        try:
+            parser.add_argument(
+                "-l",
+                "--live",
+                required=False,
+                default=False,
+                help="Use live system? If false, use test system.",
+                **BOOL_KWARGS,
+            )
+            parser.add_argument(
+                "-ch",
+                "--check-only",
+                required=False,
+                default=False,
+                help="Run the pre-import check without importing.",
+                **BOOL_KWARGS,
+            )
+            break
+        except Exception as e:
+            if "type" in BOOL_KWARGS:
+                BOOL_KWARGS.pop("type", None)
+            else:
+                raise e
 
     kwargs = vars(parser.parse_args())
     kwargs["content"] = kwargs.pop("input", "")

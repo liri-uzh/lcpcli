@@ -104,19 +104,17 @@ class CustomDict:
 
 
 class SpillDict:
-    max_in_memory_items = 29999999
+    max_in_memory_items = 9999999
     overall_size = 0
     reached = False
 
     def __init__(self):
         self.in_memory = {}
-        self.tmpfile = tempfile.NamedTemporaryFile()
-        self.dc = diskcache.Cache(self.tmpfile)
+        self.dc = diskcache.Cache()
         self.size = 0
 
     def __del__(self):
-        if os.path.exists(self.tmpfile.name):
-            os.remove(self.tmpfile.name)
+        pass
 
     def __setitem__(self, key, value):
         if key in self.in_memory:

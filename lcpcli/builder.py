@@ -239,7 +239,7 @@ class Corpus:
             ):
                 atype = aopts["type"]
                 lookup = {}
-                if atype in ATYPES_LOOKUP:
+                if atype in ATYPES_LOOKUP and aname != "meta":
                     lookup = mapping.lookups[aname]
                 if atype == "text":
                     is_token = layer_name == self._token
@@ -256,7 +256,7 @@ class Corpus:
                 elif atype == "labels":
                     labels[na] = len(lookup)
                     headers.append(aname)
-                elif atype in ATYPES_LOOKUP or atype == "ref":
+                elif atype == "ref" or (atype in ATYPES_LOOKUP and aname != "meta"):
                     headers.append(f"{aname}_id")
                 else:
                     headers.append(aname)
@@ -385,9 +385,11 @@ class Corpus:
                         aname_in_conf = "target"
                     else:
                         aname_in_conf = "source"
+                toconf["attributes"][aname_in_conf] = aopts
                 if aname == "meta" and aopts["type"] == "dict":
                     toconf["hasMeta"] = True
-                toconf["attributes"][aname_in_conf] = aopts
+                    if toconf["attributes"]["meta"].get("type") == "dict":
+                        toconf["attributes"]["meta"].pop("type", None)
             if mapping.nested_set_counter > 1:
                 toconf["attributes"]["left_anchor"] = {"type": "number"}
                 toconf["attributes"]["right_anchor"] = {"type": "number"}
@@ -458,7 +460,7 @@ class Layer:
                 return True
         return False
 
-    def _children(self, recursive: False) -> list["Layer"]:
+    def _children(self, recursive: bool = False) -> list["Layer"]:
         if not recursive:
             return self._contains
         ch: list[Layer] = []
@@ -577,7 +579,7 @@ class Layer:
             }
             if atype == "ref":
                 mapping.attributes[aname]["ref"] = attr._ref.lower()
-            elif atype in ATYPES_LOOKUP:
+            elif atype in ATYPES_LOOKUP and aname != "meta":
                 if aname not in mapping.lookups:
                     mapping.lookups[aname] = SpillDict()
                 if aname not in mapping.csvs:
@@ -643,6 +645,7 @@ class Layer:
                     # the special 'meta' attribute lists its sub-attributes directly
                     keys = mapping.attributes[aname]
                     mapping.attributes[aname].pop("keys", None)
+                    mapping.attributes[aname].pop("nullable", None)
                 for k, v in json.loads(attr._value).items():
                     meta_subattr(keys, k, v)
             if val is None:

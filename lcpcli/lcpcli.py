@@ -4,6 +4,7 @@ import shutil
 from collections.abc import Callable
 from inspect import signature
 from json import loads
+from math import ceil, log2
 from typing import Any
 
 from .check_files import Checker
@@ -122,7 +123,7 @@ then `lcpcli -c {output_path} -k $API_KEY -s $API_SECRET -p $PROJECT_NAME --live
             }
         ]
         no_index: set[tuple[str, str]] = set()
-        callback: Callable = lambda c, h, f, *_: no_index.add(
+        no_index_callback: Callable = lambda c, h, f, *_: no_index.add(
             next(
                 (
                     (lay, attr)
@@ -133,9 +134,18 @@ then `lcpcli -c {output_path} -k $API_KEY -s $API_SECRET -p $PROJECT_NAME --live
                 ("", ""),
             )
         )
+        tok = conf["firstClass"]["token"]
+        n_tokens = {"n": 0}
+        n_tokens_callback: Callable = lambda c, h, f, *_: n_tokens.__setitem__(
+            "n", n_tokens["n"] + (1 if f.startswith(tok.lower() + ".") else 0)
+        )
+        callback: Callable = lambda c, h, f, *_: n_tokens_callback(
+            c, h, f, *_
+        ) or no_index_callback(c, h, f, *_)
         checker.run_checks(
             self.kwargs["corpus"], full=True, add_zero=False, callback=callback
         )
+        self.kwargs["n_batches"] = max(1, ceil(log2(n_tokens["n"] / 1e6)))
         self.kwargs["no_index"] = [
             [lay, attr] for lay, attr in no_index if lay and attr
         ]

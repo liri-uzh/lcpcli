@@ -52,6 +52,7 @@ def lcp_upload(
     live: bool = False,
     provided_url: str = "",
     check_only: bool = False,
+    n_batches: int = 10,
     no_index: list[list[str]] = [],
     delimiter: str = "",
     quote: str = "",
@@ -210,6 +211,7 @@ def lcp_upload(
     if provided_url:
         url = provided_url
     url = url.removesuffix("/") + "/create"
+    jso["n_batches"] = n_batches or 10
     jso["no_index"] = no_index
     resp = post(url, headers=headers, json=jso)  # type: ignore
     data = resp.json()
