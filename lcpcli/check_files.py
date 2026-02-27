@@ -132,7 +132,7 @@ class Checker:
         return None
 
     def check_ftsvector(self, vector: str) -> None:
-        whole_pattern = r"^('\d+([^']|'')*':\d+(\s|$))+$"
+        whole_pattern = r"^('\d+([^']|'')*':\d+(,\d+)*(\s|$))+$"
         simple_unit_pattern = r"('([^']|'')*':[^\s]+)(\s|$)"
         units = findall(simple_unit_pattern, vector)
         for n, (unit, *_) in enumerate(units):
@@ -142,7 +142,7 @@ class Checker:
             assert match(r"'\d+", unit), SyntaxError(
                 f"Each value in the tsvector must start with a single quote character followed by an integer index ({unit} -- {n})"
             )
-            m = match(r"'\d+(.*)':\d+\s?$", unit)
+            m = match(r"'\d+(.*)':\d+(,\d+)*\s?$", unit)
             assert m, SyntaxError(
                 f"Each value in the tsvector must end with a single quote followed by a colon and an integer index ({unit} -- {n})"
             )
