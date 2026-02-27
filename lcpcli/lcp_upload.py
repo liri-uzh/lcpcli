@@ -30,7 +30,7 @@ COMPRESSED_EXTENSIONS = ("zip", "tar", "tar.gz", "tar.xz", "7z")
 AUDIOVIDEO_EXTENSIONS = ("mp3", "mp4", "wav", "ogg")
 IMAGE_EXTENSIONS = ("png", "jpg", "jpeg", "bmp")
 
-POST_SIZE_LIMIT = 5 * 1000000000  # in bytes
+POST_SIZE_LIMIT = 10 * 1000000000  # in bytes
 
 
 def post(*args, **kwargs):
