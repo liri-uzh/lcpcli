@@ -87,7 +87,7 @@ def _parse_cmd_line():
         "--escape",
         type=str,
         required=False,
-        help="The character used to escape a character in the uploaded files (default is backslash \)",
+        help="The character used to escape a character in the uploaded files (default is backslash \\)",
     )
     parser.add_argument(
         "-j",
@@ -119,6 +119,14 @@ def _parse_cmd_line():
                 required=False,
                 default=False,
                 help="Run the pre-import check without importing.",
+                **BOOL_KWARGS,
+            )
+            parser.add_argument(
+                "-v",
+                "--version",
+                required=False,
+                default=False,
+                help="The current version of LCPCLI",
                 **BOOL_KWARGS,
             )
             break

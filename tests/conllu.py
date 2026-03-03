@@ -133,10 +133,10 @@ conllu_str = """# newdoc id = unine15a01m
 # start = 2.99
 # text = ben disons que j'ai pas l'im/
 # who = unine15-001
-1	ben	ben	_	ITJ	_	_	_	_	start=2.99|end=3.11
+1	ben	ben	_	ITJ	_	2	_	_	start=2.99|end=3.11
 2	disons	dire	_	VER	_	_	_	_	agreement=1p|start=3.11|end=3.35
 3	que	que	_	CON	_	_	_	_	conjunction=CON|key=MINg|start=3.35|end=3.47
-4	j'	je	_	PRO	_	_	_	_	agreement=1s|start=3.47|end=3.55
+4	j'	je	_	PRO	_	5	_	_	agreement=1s|start=3.47|end=3.55
 5	ai	avoir	_	VER	_	_	_	_	agreement=1s|start=3.55|end=3.63
 6	pas	pas	_	ADV	_	_	_	_	start=3.63|end=3.75
 7	l'	le	_	DET	_	_	_	_	agreement=ms:fs|start=3.75|end=3.83

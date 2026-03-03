@@ -36,6 +36,9 @@ class Lcpcli:
 
     def run(self) -> None:
 
+        if self.kwargs.get("version"):
+            print("LCPCLI version: 0.2.9")
+
         if example_destination := self.kwargs.get("example"):
             if not os.path.isdir(example_destination):
                 raise FileNotFoundError(
