@@ -1,5 +1,6 @@
 import os
 
+from lcpcli.__init__ import __version__
 from setuptools import setup
 
 
@@ -12,7 +13,7 @@ def read(fname):
 
 setup(
     name="lcpcli",
-    version="0.2.9",
+    version=__version__,
     description="CLI tool combining LCP Upload and LCP Corpert",
     long_description=read("README.md"),
     long_description_content_type="text/markdown",

@@ -7,6 +7,7 @@ from json import loads
 from math import ceil, log2
 from typing import Any
 
+from . import __version__
 from .check_files import Checker
 from .corpert import Corpert
 from .lcp_upload import lcp_upload
@@ -37,7 +38,7 @@ class Lcpcli:
     def run(self) -> None:
 
         if self.kwargs.get("version"):
-            print("LCPCLI version: 0.2.9")
+            print(f"LCPCLI version: {__version__}")
 
         if example_destination := self.kwargs.get("example"):
             if not os.path.isdir(example_destination):
