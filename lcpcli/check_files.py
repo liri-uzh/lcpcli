@@ -68,6 +68,8 @@ class Checker:
                 subtyps = aprops
             elif aprops.get("type") == "dict":
                 subtyps = {k: v.get("type") for k, v in aprops.get("keys", {}).items()}
+            if typ == "number" and aprops.get("subtype", "") == "float":
+                typ = "float"
             ret[aname] = (acol, typ, subtyps)
         return ret
 
@@ -82,6 +84,21 @@ class Checker:
 
     def check_uuid(self, uuid: str) -> None:
         assert UUID(uuid, version=4), SyntaxError(f"Invalid UUID ({uuid})")
+
+    def check_number(self, value: str, aname: str = "") -> None:
+        is_digit = value.strip().isdigit()
+        is_almost_digit = not is_digit and value.strip().replace(".", "", 1).isdigit()
+        if is_almost_digit:
+            raise TypeError(
+                f"Number attribute {aname} appears to contain floating values ({value}); add 'subtype': 'float' to its properties."
+            )
+        assert is_digit, TypeError(f"Number attribute {aname} is ill-formed: {value}")
+
+    def check_float(self, value: str, aname: str = "") -> None:
+        is_numerical = value.strip().replace(".", "", 1).isdigit()
+        assert is_numerical, TypeError(
+            f"Float number attribute {aname} is ill-formed: {value}"
+        )
 
     def check_categorical(self, value: str, values: None | list[str]) -> None:
         assert len(value.encode("utf-8")) <= NAMEDATALEN, ValueError(
@@ -490,7 +507,7 @@ class Checker:
                     typ = columns[headers[n]]
                     if not col:
                         assert headers[n] in nullables, ValueError(
-                            f"Found an empty value for column #{n+1} ({headers[n]}) on line {counter} in {filename} even though the configuration does not reported it as nullable"
+                            f"Found an empty value for column #{n+1} ({headers[n]}) on line {counter} in {filename} even though the configuration does not report it as nullable"
                         )
                         continue
                     if typ == "int":
@@ -523,6 +540,10 @@ class Checker:
                                 self.check_uuid(col)
                             elif typ == "ftsvector":
                                 self.check_ftsvector(col)
+                            elif typ == "number":
+                                self.check_number(col, headers[n])
+                            elif typ == "float":
+                                self.check_float(col, headers[n])
                             elif typ == "categorical":
                                 assert layer_name, NotImplementedError(
                                     f"Attributes of type 'categorical' are only supported on layers ({filename})"

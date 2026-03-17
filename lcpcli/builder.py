@@ -569,6 +569,10 @@ class Layer:
         # Add any new attribute to mapping
         for aname, attr in self._attributes.items():
             if aname in mapping.attributes:
+                try:
+                    mapping.attributes[aname]["subtype"] = attr._subtype
+                except:
+                    pass
                 continue
             atype = attr._type
             mapping.attributes[aname] = {
@@ -577,6 +581,10 @@ class Layer:
                     True if mapping.counter > 1 else False
                 ),  # adding a new attribute
             }
+            try:
+                mapping.attributes[aname]["subtype"] = attr._subtype
+            except:
+                pass
             if atype == "ref":
                 mapping.attributes[aname]["ref"] = attr._ref.lower()
             elif atype in ATYPES_LOOKUP and aname != "meta":
@@ -724,6 +732,8 @@ class Layer:
 class Attribute:
     def __init__(self, layer: Layer, name: str, value: Any = None):
         self._name = name
+        if name not in layer._attributes:
+            layer._attributes[name] = self
         self._value = value
         self._layer = layer
         self._ref = None
@@ -739,6 +749,10 @@ class Attribute:
             self._value = json.dumps(sorted_dict(value))
         elif isinstance(value, (int, float)):
             atype = "number"
+            if isinstance(value, float):
+                self._subtype = "float"
+                # overwrite to ensure subtype is taken into consideration
+                layer._attributes[name] = self
         elif isinstance(value, GlobalAttribute):
             atype = "ref"
             self._ref = value._name
@@ -747,7 +761,6 @@ class Attribute:
             atype = "entity"
             self._ref = value._name
         self._type: str = atype
-        layer._attributes[name] = self
 
 
 class GlobalAttribute:

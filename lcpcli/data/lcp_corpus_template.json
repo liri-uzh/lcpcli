@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://liri.linguistik.uzh.ch/v2/lcp_corpus_template.json",
+    "$id": "https://liri.linguistik.uzh.ch/v3/lcp_corpus_template.json",
     "title": "LCP Corpus Template",
     "description": "Configuration of a corpus as represented in LCP",
     "type": "object",
@@ -42,6 +42,14 @@
                                 "labels",
                                 "image",
                                 "boolean"
+                            ]
+                        },
+                        "subtype": {
+                            "description": "The subtype of a number attribute",
+                            "type": "string",
+                            "enum": [
+                                "float",
+                                "integer"
                             ]
                         },
                         "nullable": {
