@@ -110,6 +110,16 @@ def find_config_file(path: str) -> str:
     return config_file_ref
 
 
+def deep_merge_dict(source, destination):
+    for key, value in source.items():
+        if isinstance(value, dict):
+            node = destination.setdefault(key, {})
+            deep_merge_dict(value, node)
+        else:
+            destination[key] = value
+    return destination
+
+
 class CustomDict:
     def __init__(self, is_ufeat=False):
         self._dictionary = {}

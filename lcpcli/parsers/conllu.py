@@ -31,7 +31,7 @@ from ..utils import (
     Segment,
     Text,
     Token,
-    parse_csv,
+    deep_merge_dict,
 )
 
 RESERVED_KEYS = {"document": ["media"]}
@@ -76,6 +76,11 @@ class CONLLUParser(Parser):
     def right(self):
         return self.left + 1
 
+    def set_layer_config(self, layer: str, config: dict):
+        self.config.setdefault("layer", {})
+        self.config["layer"].setdefault(layer, {})
+        deep_merge_dict(config, self.config["layer"][layer])
+
     def parse_sentence(
         self, sentence_lines, config={}
     ) -> tuple[Segment | None, Document | None]:
@@ -84,9 +89,8 @@ class CONLLUParser(Parser):
         """
         new_doc = None
         config = self.config or {}
-        token_from_config = config.get("layer", {}).get(
-            config.get("firstClass", {}).get("token"), {}
-        )
+        token_layer = config.get("firstClass", {}).get("token")
+        token_from_config = config.get("layer", {}).get(token_layer, {})
         token_conf_attributes = token_from_config.get("attributes", {})
         current_sentence: dict = {"meta": {}, "text": []}
         mediaSlots = self.config.get("meta", {}).get("mediaSlots", {})
@@ -132,6 +136,21 @@ class CONLLUParser(Parser):
         sentence = None
         if current_sentence["text"]:
             sentence = Segment()
+            deprel_conf = {
+                "abstract": True,
+                "layerType": "relation",
+                "attributes": {
+                    "udep": {"type": "categorical", "isGlobal": True, "nullable": True},
+                    "source": {
+                        "name": "dependent",
+                        "entity": "Token",
+                        "nullable": False,
+                    },
+                    "target": {"name": "head", "entity": "Token", "nullable": True},
+                    "left_anchor": {"type": "number", "nullable": False},
+                    "right_anchor": {"type": "number", "nullable": False},
+                },
+            }
             for t in current_sentence["text"]:
                 token = Token()
                 sentence.tokens.append(token)
@@ -153,10 +172,22 @@ class CONLLUParser(Parser):
                             pk, pv = pkpv.split("=")
                             d[pk.strip()] = pv.strip()
                         token.attributes["ufeat"] = Meta("ufeat", d)
+                        self.set_layer_config(
+                            token_layer,
+                            {
+                                "hasMeta": True,
+                                "attributes": {
+                                    "meta": {
+                                        "ufeat": {"type": "text", "nullable": True}
+                                    }
+                                },
+                            },
+                        )
                     elif k == "head":
                         if v == "0":
                             v = None
                         token.attributes["deprel"] = Dependency("deprel", v)
+                        self.set_layer_config("DepRel", deprel_conf)
                     elif k == "deprel":
                         dep: Dependency = cast(
                             Dependency,
@@ -164,6 +195,7 @@ class CONLLUParser(Parser):
                         )
                         dep.label = v
                         token.attributes["head"] = dep
+                        self.set_layer_config("DepRel", deprel_conf)
                     elif (
                         k == "misc"
                         or token_conf_attributes.get(k, {}).get("type") == "dict"
@@ -198,6 +230,19 @@ class CONLLUParser(Parser):
                                 else "misc"
                             )
                         token.attributes[attname] = Meta(attname, kv_obj)
+                        if "misc" not in token_conf_attributes:
+                            self.set_layer_config(
+                                token_layer,
+                                {
+                                    "hasMeta": True,
+                                    "attributes": {
+                                        "meta": {
+                                            attname: {"type": "text", "nullable": True}
+                                        }
+                                    },
+                                },
+                            )
+
                     elif token_conf_attributes.get(k, {}).get("type") == "categorical":
                         token.attributes[k] = Categorical(k, v.rstrip())
                     else:
@@ -252,17 +297,40 @@ class CONLLUParser(Parser):
                 # if name.lower() in segment_containers:
                 #     sentence.attributes[name] = Text(name, meta.pop(name))
                 sentence.attributes["meta"] = Meta("meta", meta)
+                self.set_layer_config(
+                    seg_layer,
+                    {
+                        "hasMeta": True,
+                        "attributes": {
+                            "meta": {
+                                k: {"type": "text", "nullable": True} for k in meta
+                            }
+                        },
+                    },
+                )
 
         ret_doc: Document | None = None
         if new_doc:
+            doc_layer = config.get("firstClass", {}).get("document", "")
             ret_doc = Document()
             if id := new_doc.get("id"):
                 print(f"Parsing document '{id}'")
                 new_doc["meta"]["name"] = id
             ret_doc.attributes["meta"] = Meta("meta", new_doc["meta"])
+            self.set_layer_config(
+                doc_layer,
+                {
+                    "hasMeta": True,
+                    "attributes": {
+                        "meta": {
+                            k: {"type": "text", "nullable": True}
+                            for k in new_doc["meta"]
+                        }
+                    },
+                },
+            )
             if new_doc.get("media"):
                 ret_doc.attributes["media"] = Meta("media", new_doc["media"])
-            doc_layer = config.get("firstClass", {}).get("document", "")
             doc_config = (
                 config.get("layer", {}).get(doc_layer, {}).get("attributes", {})
             )

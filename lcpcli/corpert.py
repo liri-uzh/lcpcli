@@ -473,7 +473,6 @@ class Corpert:
             parser = parser or PARSERS[self._determine_format(filepath)](
                 config=json_obj, labels=labels
             )
-            print(filepath)
             try:
                 # First pass: check that the file has some content
                 with open(filepath, "r", encoding="utf-8") as f:
