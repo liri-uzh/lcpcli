@@ -11,6 +11,7 @@ from .parsers.conllu import CONLLUParser
 from .cli import _parse_cmd_line
 from .utils import (
     default_json,
+    find_config_file,
     get_file_from_base,
     is_char_anchored,
     is_time_anchored,
@@ -340,27 +341,17 @@ class Corpert:
 
         ignore_files = set()
         json_obj = None
-        json_file = next(
-            (
-                os.path.join(self._path, f)
-                for f in os.listdir(self._path)
-                if f.endswith(".json")
-            ),
-            "",
-        )
-        if os.path.isfile(json_file):
+        try:
+            json_file = find_config_file(self._path)
+            print("validated json schema")
             ignore_files.add(json_file)
             with open(json_file, "r", encoding="utf-8") as jsf:
                 json_obj = json.loads(jsf.read())
-        else:
+        except:
             json_obj = default_json(
                 next(reversed(self._path.split(os.path.sep))) or "Anonymous Project"
             )
-        parent_dir = os.path.dirname(__file__)
-        schema_path = os.path.join(parent_dir, "data", "lcp_corpus_template.json")
-        with open(schema_path, "r", encoding="utf-8") as schema_file:
-            validate(json_obj, json.loads(schema_file.read()))
-            print("validated json schema")
+            print("using a default json configuration")
 
         output_path = self.output or "."
         os.makedirs(
@@ -463,7 +454,7 @@ class Corpert:
             if (
                 os.path.isfile(f)
                 and f not in ignore_files
-                and os.path.basename(f) != "meta.json"
+                and not f.endswith(".json")
                 # discard files named like layer names
                 and Path(f).stem.lower()
                 not in {k.lower() for k in json_obj.get("layer", {})}
@@ -596,11 +587,11 @@ class Corpert:
 
         print(f"outfiles written to '{self.output}'.")
         json_str = json.dumps(json_obj, indent=4)
-        json_path = os.path.join(output_path, "meta.json")
+        json_path = os.path.join(output_path, "config.json")
         open(json_path, "w", encoding="utf-8").write(json_str)
         # print(f"\n{json_str}\n")
         print(
-            f"A default meta.json file with the structure above was automatically generated at '{json_path}' for the current corpus."
+            f"A default config.json file with the structure above was automatically generated at '{json_path}' for the current corpus."
         )
         print(f"Please review it and make any changes as needed in a text editor.")
 

@@ -4,10 +4,10 @@ import io
 import json
 import os
 import re
-import tempfile
 import uuid
 
 from datetime import date
+from jsonschema import validate
 from pathlib import Path
 
 
@@ -84,6 +84,30 @@ def sorted_dict(d: dict) -> dict:
             v = sorted(v)
         ret[k] = v
     return ret
+
+
+def find_config_file(path: str) -> str:
+    parent_dir = os.path.dirname(__file__)
+    schema_path = os.path.join(parent_dir, "data", "lcp_corpus_template.json")
+    with open(schema_path, "r", encoding="utf-8") as schema_file:
+        config_schema = json.loads(schema_file.read())
+    config_file_ref: str = ""
+    for f in os.listdir(path):
+        if not f.endswith(".json"):
+            continue
+        config_file_ref = f
+        with open(os.path.join(path, f), "r") as config_input:
+            try:
+                config_json = json.loads(config_input.read())
+                validate(config_json, config_schema)
+                break
+            except:
+                config_file_ref = ""
+
+    if not config_file_ref:
+        raise FileNotFoundError(f"No valid JSON configuration file found in {path}")
+
+    return config_file_ref
 
 
 class CustomDict:

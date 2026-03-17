@@ -4,6 +4,7 @@ import shutil
 from collections.abc import Callable
 from inspect import signature
 from json import loads
+from jsonschema import validate
 from math import ceil, log2
 from typing import Any
 
@@ -12,6 +13,7 @@ from .check_files import Checker
 from .corpert import Corpert
 from .lcp_upload import lcp_upload
 from .cli import _parse_cmd_line
+from .utils import find_config_file
 
 
 class Lcpcli:
@@ -73,8 +75,8 @@ then `lcpcli -c {output_path} -k $API_KEY -s $API_SECRET -p $PROJECT_NAME --live
         if corpert:
             path = self.kwargs.get("output", os.path.dirname(corpert._path))
 
-            if not any(i.endswith(".json") for i in os.listdir(path)):
-                raise FileNotFoundError(f"No JSON file found in {path}")
+            # Check for the existence of a valid config file
+            find_config_file(path)
 
             print(
                 f"Please review the content of the configuration file, then press any key to proceed."
@@ -100,12 +102,7 @@ then `lcpcli -c {output_path} -k $API_KEY -s $API_SECRET -p $PROJECT_NAME --live
         if not self.kwargs.get("corpus"):
             raise ValueError("No corpus found to upload")
 
-        json_file = next(
-            (f for f in os.listdir(self.kwargs["corpus"]) if f.endswith(".json")), None
-        )
-        assert json_file, FileNotFoundError(
-            f"Could not find a JSON configuration file in {self.kwargs['corpus']}"
-        )
+        json_file = find_config_file(self.kwargs["corpus"])
         conf: dict[str, Any] = loads(
             open(
                 os.path.join(self.kwargs["corpus"], json_file), "r", encoding="utf-8"

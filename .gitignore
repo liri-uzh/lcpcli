@@ -2,6 +2,7 @@ __pycache__/
 lcpcli/__pycache__/
 tmp.py
 *.pyc
+.env
 build/
 dist/
 dist/

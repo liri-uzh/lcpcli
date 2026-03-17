@@ -206,7 +206,7 @@ def lcp_upload(
         this_corpus_projects.append(project)
     jso["projects"] = this_corpus_projects
 
-    print("Sending template...", jso)
+    print("Sending template...")
     url = CREATE_URL if live else CREATE_URL_TEST
     if provided_url:
         url = provided_url
@@ -396,7 +396,6 @@ def check_template_and_send(
 
     upload_url = url.removesuffix("/") + "/upload"
     resp = post(upload_url, params=jso, headers=headers, files=files, verify=False)  # type: ignore
-    print("files", files)
 
     time.sleep(5)
 
@@ -407,7 +406,6 @@ def check_template_and_send(
     except Exception:
         print("Error", resp)
 
-    print("data", data)
     if "target" not in data:
         print(f"Failed:")
         for k, v in data.items():
@@ -504,7 +502,6 @@ def check_template(
         if not status or not (elapsed * 10 % wait):
             url = url.removesuffix("/") + data["target"]
             cparams = {"job": data["job"], "project": project}
-            print("within check_template", cparams, url, data)
             resp = post(url, params=cparams, headers=headers)  # type: ignore
             data = resp.json()
             if data.get("status") != status:
