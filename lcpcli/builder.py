@@ -85,9 +85,19 @@ def get_layer_method(layer: "Layer"):
                 a.make()
             return
         # source is the attribute that's missing in at least one layer
-        source_a = next(
-            ra for ra in relation_attrs if any(ra not in a._attributes for a in args)
-        )
+        try:
+            source_a = next(
+                ra
+                for ra in relation_attrs
+                if any(ra not in a._attributes for a in args)
+            )
+        except:
+            # if can't identify a missing attribute,
+            # look for "head"/"source" or use the first one
+            source_a = next(
+                (ra for ra in relation_attrs if ra in ("head", "source")),
+                next(ra for ra in relation_attrs),
+            )
         target_a = next(ra for ra in relation_attrs if ra != source_a)
         # reference nested sets by target's id
         nested_sets = {
