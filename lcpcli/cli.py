@@ -25,12 +25,6 @@ def _parse_cmd_line():
         "-e", "--extension", type=str, help="Output format when output is a directory"
     )
     parser.add_argument(
-        "-f", "--filter", required=False, type=str, help="Path to a Python filter file"
-    )
-    parser.add_argument(
-        "-u", "--lua-filter", required=False, type=str, help="Path to a Lua filter file"
-    )
-    parser.add_argument(
         "-x",
         "--example",
         required=False,

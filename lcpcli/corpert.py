@@ -66,8 +66,6 @@ class Corpert:
         content,
         output=None,
         extension=None,
-        filter=None,
-        lua_filter=None,
         combine=True,
         **kwargs,
     ):
@@ -83,9 +81,6 @@ class Corpert:
             self._output_format = os.path.splitext(self.output)[-1]
         if self.output and not os.path.exists(self.output) and not combine:
             os.makedirs(self.output)
-        self._filter = filter
-        self._lua_filter = lua_filter
-        self._lua = None
         self._input_files = []
         self._path = os.path.normpath(content)
         self._combine = combine
@@ -304,40 +299,10 @@ class Corpert:
         with open(filename, "w", encoding="utf-8") as fo:
             fo.write(data)
 
-    def _setup_filters(self):
-        """
-        If user wants to do lua/python filtering, we prepare things here
-        """
-        if self._lua_filter:
-            # import lupa
-            from lupa import LuaRuntime
-
-            self._lua = LuaRuntime(unpack_returned_tuples=True)
-        elif self._filter:
-            pass
-
-    def _apply_lua_filter(self, content):
-        """
-        Run user's lua function on the JSON data for a file
-        """
-        with open(self._lua_filter, "r", encoding="utf-8") as fo:
-            script = fo.read()
-        func = self._lua.eval(script)
-        return func(content)
-
-    def _apply_filter(self, content):
-        """
-        Run user's python function on the JSON data for a file
-        """
-        with open(self._filter, "r", encoding="utf-8") as fo:
-            script = fo.read()
-        return exec(script, {}, {"content": content})
-
     def run(self):
         """
         The main routine: read in all input files and print/write them
         """
-        self._setup_filters()
 
         ignore_files = set()
         json_obj = None
