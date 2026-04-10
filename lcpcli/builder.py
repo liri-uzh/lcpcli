@@ -16,9 +16,7 @@ ANCHORINGS = ("stream", "time", "location")
 # ATYPES = ("text", "categorical", "number", "dict", "labels")
 ATYPES_LOOKUP = ("text", "dict", "labels")
 NAMEDATALEN = 63
-PATTERN_TXT = (
-    "(must start with a lower case and only contain alpha-numerical characters)"
-)
+PATTERN_TXT = "(must start with a lower case, be at leat 2 characters long and only contain alpha-numerical characters)"
 
 
 def meta_subattr(meta: dict, k: str, v: Any) -> dict:
@@ -98,7 +96,10 @@ def get_layer_method(layer: "Layer"):
                 (ra for ra in relation_attrs if ra in ("head", "source")),
                 next(ra for ra in relation_attrs),
             )
-        target_a = next(ra for ra in relation_attrs if ra != source_a)
+        target_a = next((ra for ra in relation_attrs if ra != source_a), None)
+        if not target_a:
+            # no target: possibly a one-token sentence, return
+            return
         # reference nested sets by target's id
         nested_sets = {
             a._attributes[target_a]._value._id: NestedSet(
