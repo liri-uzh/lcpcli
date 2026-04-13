@@ -36,7 +36,7 @@ dependencies = [
 
 
 [project.urls]
-Homepage = "https://github.com/liri-uzh/lcpcli/issues"
+Homepage = "https://github.com/liri-uzh/lcpcli"
 Issues = "https://github.com/liri-uzh/lcpcli/issues"
 
 [build-system]
