@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import re
 import sys
 import time
 
@@ -206,24 +207,48 @@ def lcp_upload(
         this_corpus_projects.append(project)
     jso["projects"] = this_corpus_projects
 
-    print("Sending template...")
-    url = CREATE_URL if live else CREATE_URL_TEST
-    if provided_url:
-        url = provided_url
-    url = url.removesuffix("/") + "/create"
-    jso["n_batches"] = n_batches or 10
-    jso["no_index"] = no_index
-    resp = post(url, headers=headers, json=jso)  # type: ignore
-    data = resp.json()
-    jso["quote"] = quote
-    jso["delimiter"] = delimiter
-    jso["escape"] = escape
-    ret = check_template_and_send(
-        data, headers, jso, corpus, base, filt, live, provided_url=provided_url
-    )
+    try_send: bool = True
+    overwrite_id: int = 0
+    while try_send:
+        print("Sending template...")
+        url = CREATE_URL if live else CREATE_URL_TEST
+        if provided_url:
+            url = provided_url
+        url = url.removesuffix("/") + "/create"
+        jso["n_batches"] = n_batches or 10
+        jso["no_index"] = no_index
+        jso["overwrite"] = True if overwrite_id and overwrite_id > 0 else False
+        resp = post(url, headers=headers, json=jso)  # type: ignore
+        data = resp.json()
+        jso["quote"] = quote
+        jso["delimiter"] = delimiter
+        jso["escape"] = escape
+        ret = check_template_and_send(
+            data, headers, jso, corpus, base, filt, live, provided_url=provided_url
+        )
+        if ret and ret[0] == "already exists":
+            overwrite_id = int(ret[1])
+            ret = tuple()
+            corpus_name = (
+                template_data.get("meta", {}).get("name", "") if template_data else ""
+            )
+            print(
+                f"Do you want to overwrite the existing corpus {corpus_name} (#{overwrite_id}) with this one?"
+            )
+            print("Enter Y/YES/y/yes or N/NO/n/no")
+            should_overwrite = input()
+            if not re.match(r"(y|yes)", should_overwrite, re.IGNORECASE):
+                overwrite_id = 0
+                print("Aborting the upload process.")
+                return
+        else:
+            try_send = False
+
     if not ret:
         return
-    if not monitor_upload(*ret):
+    new_corpus_id = monitor_upload(*ret)
+    if not new_corpus_id or new_corpus_id == 0:
+        print("Upload failed, aborting now.")
         return
 
     status, error = ("finished", "")
@@ -264,8 +289,34 @@ def lcp_upload(
         )
 
     if status != "finished":
-        print(f"Media upload failed: {error}")
+        print(f"Upload failed: {error}")
     else:
+        if overwrite_id and overwrite_id > 0:
+            status, error_or_job_id = overwrite_corpus(
+                int(overwrite_id),
+                new_corpus_id,
+                headers,
+                live=live,
+                provided_url=provided_url,
+            )
+            if status == "failed":
+                print(
+                    f"Failed to overwrite corpus #{overwrite_id} with new corpus #{new_corpus_id}:"
+                )
+                print(error_or_job_id)
+                return
+            check_overwrite_url = ""
+            if not monitor_overwrite(check_overwrite_url, headers):
+                print(
+                    f"Failed to overwrite corpus #{overwrite_id} with new corpus #{new_corpus_id}."
+                )
+                print(
+                    f"Corpus #{new_corpus_id} was still successuflly uploaded; corpus #{overwrite_id} is now disabled."
+                )
+                print(
+                    f"Please contact an admin if you need to restore corpus #{overwrite_id}"
+                )
+                return
         print("Corpus uploaded.")
 
 
@@ -332,6 +383,56 @@ def send_media(
     return (data.get("status", "failed"), data.get("error", ""))
 
 
+def overwrite_corpus(
+    previous_corpus_id: int,
+    new_corpus_id: int,
+    headers: dict[str, Any],
+    live: bool,
+    provided_url: str = "",
+) -> tuple[str, str]:
+    """
+    Put to /corpora/ID/overwrite to overwrite the corpus
+    """
+    print(f"Overwriting corpus #{previous_corpus_id} with corpus #{new_corpus_id}...")
+
+    jso = {"overwrite": previous_corpus_id}
+
+    url = CREATE_URL if live else CREATE_URL_TEST
+    if provided_url:
+        url = provided_url
+    url = url.removesuffix("/") + f"/corpora/{new_corpus_id}/overwrite"
+    resp = requests.put(url, json=jso, headers=headers)  # type: ignore
+
+    time.sleep(2)
+
+    data = resp.json()
+    return (data.get("status", "failed"), data.get("job", data.get("error", "")))
+
+
+def monitor_overwrite(url: str, headers: dict[str, Any]) -> bool:
+    """
+    Poll /corpora/JOB_ID/overwrite to check the status of a job
+    """
+    wait = 8
+    bads = ("stopped", "canceled", "failed")
+
+    while True:
+        resp = requests.get(url, headers=headers)  # type: ignore
+        data = resp.json()
+
+        status = data.get("status")
+        if status in bads:
+            if status == "failed":
+                print("Overwriting failed:")
+                print(data.get("msg", "Unkown error."))
+            else:
+                print("Overwriting was interrupted.")
+            return False
+        elif status == "finished":
+            return True
+        time.sleep(wait)
+
+
 def check_template_and_send(
     data: dict[str, Any],
     headers: dict[str, Any],
@@ -353,6 +454,8 @@ def check_template_and_send(
         print(f"Failed:")
         for k, v in data.items():
             print(f"{k}: {v}")
+        if re.search(r"corpus named \S+ already exists", data.get("error", "")):
+            return ("already exists", data.get("corpus_id", "-1"))
         return tuple()
 
     url = CREATE_URL if live else CREATE_URL_TEST
@@ -417,7 +520,7 @@ def check_template_and_send(
     return new_url, headers, jso
 
 
-def monitor_upload(new_url: str, headers: dict[str, Any], jso: dict[str, Any]) -> bool:
+def monitor_upload(new_url: str, headers: dict[str, Any], jso: dict[str, Any]) -> int:
     """
     Poll /upload and check the status of a job
     """
@@ -451,7 +554,10 @@ def monitor_upload(new_url: str, headers: dict[str, Any], jso: dict[str, Any]) -
                     for k, v in data.items():
                         if k != "target" and progbar:
                             progbar.write(f"{k}: {v}")
-            return status == "finished"
+            if status == "finished":
+                return data.get("corpus_id", -1)
+            else:
+                return 0
         stat = "" if not status else status.lower()
         current, tot, text, unit = data.get("progress", "///").split("/", 3)
         if "started" in stat:
