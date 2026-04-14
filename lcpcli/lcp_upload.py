@@ -305,7 +305,13 @@ def lcp_upload(
                 )
                 print(error_or_job_id)
                 return
-            check_overwrite_url = ""
+            check_overwrite_url = CREATE_URL if live else CREATE_URL_TEST
+            if provided_url:
+                check_overwrite_url = provided_url
+            check_overwrite_url = (
+                check_overwrite_url.removesuffix("/")
+                + f"/corpora/{error_or_job_id}/overwrite"
+            )
             if not monitor_overwrite(check_overwrite_url, headers):
                 print(
                     f"Failed to overwrite corpus #{overwrite_id} with new corpus #{new_corpus_id}."
