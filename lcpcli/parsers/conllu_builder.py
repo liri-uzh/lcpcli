@@ -4,6 +4,7 @@ import re
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from lcpcli.builder import *
+from tqdm import tqdm
 
 CONLLU_COLUMNS = (
     "ID",
@@ -75,16 +76,25 @@ def process_sent(c, sent: SentenceProxy):
     # in order to optimize processing.
     # This allows one to handle cross-segment dependencies (not the case here though)
     for token_props in sent.tokens.values():
-        if not token_props.head:
+        if not token_props.deprel and not token_props.head:
             continue
         deprel_args = {
             "dependent": token_props.entity,
             "deprel": token_props.deprel,
         }
         if token_props.head != "0":
-            deprel_args["head"] = sent.tokens[token_props.head].entity
+            try:
+                deprel_args["head"] = sent.tokens[token_props.head].entity
+            except:
+                raise RuntimeError(
+                    f"A token's head points to {token_props.head} but no token with this index was found in the current sentence.",
+                    " ".join(
+                        str(v._value) for v in token_props.entity._attributes.values()
+                    ),
+                )
         sent_deps.append(c.DepRel(**deprel_args))
-    c.DepRel.make(*sent_deps)
+    if sent_deps:
+        c.DepRel.make(*sent_deps)
     for misc, form, mwu in sent.mwu:
         misc_obj = get_obj(misc)
         sent.entity.Mwu(
@@ -100,8 +110,8 @@ def create_corpus(input: Iterable[str], corpus_name: str = "Untitled corpus"):
     current_sent: SentenceProxy = SentenceProxy()
     comment_for: str = "sentence"
     for line in input:
-        # lines starting with 0 is not valid CONLLU syntax but we'll allow it
-        token_line = line.startswith(("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"))
+        # lines starting with 0 is not valid CoNLLU syntax but we'll allow it
+        token_line = re.search(r"^[0-9]+\t", line)
         if not token_line and current_sent.assigned and current_sent.tokens:
             process_sent(c, current_sent)
             current_par = LayerProxy()
@@ -115,12 +125,12 @@ def create_corpus(input: Iterable[str], corpus_name: str = "Untitled corpus"):
             if len(column_names) < 2:
                 column_names = [x.strip().lower() for x in line[19:].split(" ")]
             assert len(column_names) >= 2, ValueError(
-                f"CONLLU files must define at least two columns: ID and FORM; got {column_names} instead."
+                f"CoNLL-U files must define at least two columns: ID and FORM; got {column_names} instead."
             )
             continue
         elif line.startswith("# newdoc "):
             comment_for = "document"
-            attr, val = [x.strip() for x in line[9:].split("=", 2)]
+            attr, val = [x.strip() for x in line[9:].split("=", 1)]
             if attr == "id":
                 if current_doc.assigned:
                     current_doc.entity.make()
@@ -129,9 +139,8 @@ def create_corpus(input: Iterable[str], corpus_name: str = "Untitled corpus"):
             continue
         elif line.startswith("# newpar "):
             comment_for = "paragraph"
-            attr, val = [x.strip() for x in line[9:].split("=", 2)]
+            attr, val = [x.strip() for x in line[9:].split("=", 1)]
             current_par.set_attribute(attr, val)
-            continue
         elif line.startswith("# sent_id "):
             comment_for = "sentence"
             assert current_doc, RuntimeError(
@@ -146,7 +155,7 @@ def create_corpus(input: Iterable[str], corpus_name: str = "Untitled corpus"):
                     current_par.set_attribute(attr, val)
                 else:
                     current_doc.set_attribute(attr, val)
-            continue
+
         if current_doc.assigned and current_par.attributes:
             current_par.assign_entity(
                 current_doc.entity.Paragraph(
@@ -179,6 +188,11 @@ def create_corpus(input: Iterable[str], corpus_name: str = "Untitled corpus"):
                 )
             )
 
+        if not token_line:
+            continue
+
+        # Past the comments: start processing the tokens
+
         token_id, form, *rest = [
             "" if x == "_" else x.strip() for x in line.split("\t")
         ]
@@ -191,7 +205,9 @@ def create_corpus(input: Iterable[str], corpus_name: str = "Untitled corpus"):
             kwargs: dict = {}
             for n, x in enumerate(column_names[2:]):
                 kwargs[x] = rest[n]
-                if rest[n].replace(".", "", 1).isdigit():
+                if rest[n].isdigit():
+                    kwargs[x] = int(rest[n])
+                elif rest[n].replace(".", "", 1).isdigit():
                     kwargs[x] = float(rest[n])
             if "feats" in column_names:
                 feats_idx = column_names.index("feats")
@@ -203,6 +219,11 @@ def create_corpus(input: Iterable[str], corpus_name: str = "Untitled corpus"):
             if "misc" in column_names:
                 misc_idx = column_names.index("misc")
                 kwargs["misc"] = get_obj(rest[misc_idx - 2])
+                # special case
+                if "SpaceAfter" in kwargs["misc"]:
+                    kwargs["spaceAfter"] = (
+                        0 if kwargs["misc"].pop("SpaceAfter") == "No" else 1
+                    )
             token_proxy = TokenProxy()
             if "head" in kwargs:
                 token_proxy.head = str(int(kwargs.pop("head")))
@@ -225,16 +246,45 @@ def create_corpus(input: Iterable[str], corpus_name: str = "Untitled corpus"):
 
 def process_files(fns: list[str]) -> Corpus:
     existing_files = [fn for fn in fns if os.path.isfile(fn)]
+    total_files = len(existing_files)
+
+    progbar = tqdm(
+        total=total_files * 100,
+        desc=f"Processing {total_files} CoNLL-U files...",
+        unit_scale=True,
+        unit="byte",
+    )
+
+    def update_progress(desc: str, n: int):
+        progbar.n = n
+        progbar.set_description(desc, refresh=False)
+        progbar.refresh()
 
     def read_lines() -> Iterator[str]:
-        for fn in existing_files:
-            with open(fn, "r") as input:
+        for n_file, fn in enumerate(existing_files):
+            basename = os.path.basename(fn)
+            update_progress(
+                f"Processing {basename} ({n_file+1} / {total_files})", n_file * 100
+            )
+            file_size = os.path.getsize(fn)
+            with open(fn, "r", encoding="utf-8") as input:
                 tab_columns = "\t".join(CONLLU_COLUMNS)
                 yield f"# global.columns = {tab_columns}"
                 no_ext = Path(fn).stem
                 yield f"# newdoc id = {no_ext}"
+                chars_processed = 0
+                n_line = 1
                 while line := input.readline():
+                    chars_processed += len(line)
+                    update_progress(
+                        f"Processing {basename} ({n_file+1} / {total_files}); line {n_line}",
+                        n_file * 100
+                        + min(100, int(100.0 * chars_processed / file_size)),
+                    )
                     yield line.rstrip("\r\n")
+                    n_line += 1
+        update_progress("Tidying up", progbar.total)
+        progbar.close()
 
     corpus_name: str = (
         Path(existing_files[0]).stem if len(existing_files) == 1 else "Untitled corpus"
