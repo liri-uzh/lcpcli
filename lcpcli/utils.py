@@ -95,7 +95,7 @@ def find_config_file(path: str) -> str:
     for f in os.listdir(path):
         if not f.endswith(".json"):
             continue
-        config_file_ref = f
+        config_file_ref = os.path.join(path, f)
         with open(os.path.join(path, f), "r") as config_input:
             try:
                 config_json = json.loads(config_input.read())
@@ -118,6 +118,10 @@ def deep_merge_dict(source, destination):
         else:
             destination[key] = value
     return destination
+
+
+def yes_no_input(prompt: str = "Type YES/Y/yes/y or NO/N/no/n: ") -> bool:
+    return re.match(r"(no|n)", input(prompt), re.IGNORECASE) is None
 
 
 class CustomDict:

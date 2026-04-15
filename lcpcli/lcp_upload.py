@@ -235,8 +235,7 @@ def lcp_upload(
             print(
                 f"Do you want to overwrite the existing corpus {corpus_name} (#{overwrite_id}) with this one?"
             )
-            print("Enter Y/YES/y/yes or N/NO/n/no")
-            should_overwrite = input()
+            should_overwrite = input("Type Y/YES/y/yes or N/NO/n/no: ")
             if not re.match(r"(y|yes)", should_overwrite, re.IGNORECASE):
                 overwrite_id = 0
                 print("Aborting the upload process.")
