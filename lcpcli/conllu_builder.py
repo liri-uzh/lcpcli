@@ -97,9 +97,9 @@ def process_sent(c, sent: SentenceProxy):
         try:
             c.DepRel.make(*sent_deps)
         except:
-            import pdb
-
-            pdb.set_trace()
+            print(
+                f"Warning: failed to create a nested-tree structure for the depdendencies of the current sentence. Check the integrity of the head references."
+            )
     for misc, form, mwu in sent.mwu:
         misc_obj = get_obj(misc)
         sent.entity.Mwu(
