@@ -404,10 +404,11 @@ class Checker:
                 "vector": "ftsvector",
             }
         elif "_" in no_ext:
-            lname, aname, *remainder = no_ext.split("_")
-            assert not remainder, SyntaxError(
-                f"Invalid filename: {filename} (cannot contain more than one underscore character)"
-            )
+            # lname, aname, *remainder = no_ext.split("_")
+            # assert not remainder, SyntaxError(
+            #     f"Invalid filename: {filename} (cannot contain more than one underscore character)"
+            # )
+            lname, aname = no_ext.split("_", 1)
             props = next(
                 (v for k, v in layer.items() if k.lower() == lname.lower()), None
             )
