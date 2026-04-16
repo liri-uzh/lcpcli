@@ -1,6 +1,6 @@
 # Corpus builder - Tutorial
 
-In this tutorial, we will build a small corpus from a CoNLL-U input, which is a standard format to represent data in corpus linguistics. Note that `lcpcli` ships with a built-in CoNLL-U converter; this tutorial partly reproduces what `lcpcli` implements natively for the sake of illustration.
+In this tutorial, we will build a small corpus from a CoNLL-U input, which is a standard format to represent data in corpus linguistics. Note that `lcpcli` ships with a built-in CoNLL-U converter; this tutorial partly reproduces what `lcpcli` implements natively for the sake of illustration. The approach illustrated here can be applied to any input format (XML, TEI, etc.) with relatively minimal adjustments to read and parse the input.
 
 The CoNLL-U input in this tutorial was generated from subtitles SRT files associated with videos. In a first step, we will simply take the forms and lemmas of the transcribed tokens in the CoNLL-U inpuyt and map them to segmented sentences. In a second step, we will incorporate additional attributes of the tokens and of the sentences present in the input. Finally, in a third step, we will associate the data with video files and correspondingly anchor the sentences along the time axis.
 
@@ -258,7 +258,7 @@ c.make("./test_corpus_output/")
 
 # Multiple documents
 
-Here, we will use two CoNLL-U files, `database_explorer.conllu` and `presenter_pro.conllu`. These files, along with their respective videos, can be found here: https://drive.switch.ch/index.php/s/v3uxBpNkeYuyPE2
+Here, we will use two CoNLL-U files, `database_explorer.conllu` and `presenter_pro.conllu`. These files, along with their respective videos, can be found here: https://drive.switch.ch/index.php/s/scGvtnNTj5vTYd4
 
 The only thing we need to do to process multiple documents, besides iteratevely calling `process_file` with filenames, is handle temporal offsets.
 
