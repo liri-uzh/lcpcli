@@ -4,7 +4,6 @@ import shutil
 from collections.abc import Callable
 from inspect import signature
 from json import loads
-from jsonschema import validate
 from math import ceil, log2
 from typing import Any
 

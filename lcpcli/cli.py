@@ -1,5 +1,4 @@
 import argparse
-
 from typing import Any
 
 BOOL_KWARGS: dict[str, Any]
