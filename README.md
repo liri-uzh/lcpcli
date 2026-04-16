@@ -78,4 +78,4 @@ Previous versions of `lcpcli` defined procedures to include rich annotations in 
 
 `lcpcli` now ships with a Python module called `lcpcli.builder` that you can use to convert any input format. The default CoNLL-U converter included in `lcpcli` uses `lcpcli.builder` under the hood.
 
-Please visit [the LCP documentation](https://lcp.linguistik.uzh.ch/manual/builder.html) to learn more about the `lcpcli.builder` module.
+You can find a short tutorial on how to use the module [in BUILDER.md](BUILDER.md). Further information can be found in [the LCP documentation](https://lcp.linguistik.uzh.ch/manual/builder.html).
