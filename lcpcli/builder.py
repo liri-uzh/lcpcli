@@ -51,11 +51,13 @@ def get_layer_method(layer: "Layer"):
             corpus._files.pop(fname)
             return GlobalAttribute(corpus, layer._name, args[0])
         largs = [a for a in args]
-        if layer._name == corpus._token and isinstance(largs[0], str):
+        if layer._name == corpus._token and largs and isinstance(largs[0], str):
             form = largs.pop(0)
             layer.form = form
         if len(largs) > 0:
-            assert all(isinstance(c, Layer) for c in largs), RuntimeError()
+            assert all(isinstance(c, Layer) for c in largs), RuntimeError(
+                "Tried to pass non-layers as arguments of a layer"
+            )
             layer.add(*largs)
         for aname, avalue in kwargs.items():
             setattr(layer, aname, avalue)
@@ -429,6 +431,16 @@ class Layer:
             assert re.match(r"[a-z][a-zA-Z0-9_]+$", name), RuntimeError(
                 f"The attribute '{name}' on the layer {self._name} does not match the pattern {PATTERN_TXT}"
             )
+            # Disallow linebreak in token string values because it messes with CSV's (in particular, FTS)
+            if (
+                self._name == self._corpus._token
+                and isinstance(value, str)
+                and ("\n" in value or "\r" in value)
+            ):
+                print(
+                    f"Warning: a token attribute contains a linebreak; this is not allowed, removing the linebreaks from the value {value}."
+                )
+                value = value.replace("\n", "").replace("\r", "")
             Attribute(self, name, value)
 
     def __getattribute__(self, name: str):
@@ -505,6 +517,9 @@ class Layer:
             rows.append(doc_name)
             rows.append(json.dumps(self._media))
         if is_token:
+            assert "form" in self._attributes, RuntimeError(
+                "Tried to make a token with no form"
+            )
             seg_parent = self._find_in_parents(corpus._segment)
             rows.append(seg_parent._id)
             char_low = corpus._char_counter

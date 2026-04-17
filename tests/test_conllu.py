@@ -2,6 +2,7 @@ import json
 import os
 import re
 import shutil
+import pytest
 
 from lcpcli.builder import *
 from lcpcli.check_files import Checker
@@ -41,84 +42,12 @@ def process_sent(c, sent: dict):
         ).make()
 
 
-def create_corpus(conllu: str):
-    shutil.rmtree(TMP_FOLDER)
-    os.makedirs(TMP_FOLDER)
-    c = Corpus("my test conllu corpus")
-    current_doc: dict = {"attributes": {}, "entity": None}
-    current_sent: dict = {"attributes": {}, "entity": None, "tokens": {}, "mwu": []}
-    for line in conllu.split("\n"):
-        line = line.strip()
-        if not line:
-            continue
-        if line.startswith("# newdoc "):
-            attr, val = line[9:].split("=", 2)
-            if attr == "id":
-                if current_doc["entity"]:
-                    current_doc["entity"].make()
-                current_doc = {"attributes": {}, "entity": None}
-            current_doc["attributes"][attr.strip()] = val.strip()
-            continue
-        if line.startswith("# sent_id "):
-            if current_sent["entity"]:
-                process_sent(c, current_sent)
-            assert current_doc, RuntimeError(
-                "Encountered a new sentence before a new document"
-            )
-            current_doc["entity"] = c.Document(
-                **{
-                    x.replace("id", "docid"): y
-                    for x, y in current_doc["attributes"].items()
-                    if x not in ("start", "end")
-                }
-            )
-            current_sent = {"attributes": {}, "entity": None, "tokens": {}, "mwu": []}
-        if m := re.match(r"# ([^=]+)=(.+)$", line):
-            if m[1].strip() and m[2].strip():
-                current_sent["attributes"][m[1].strip()] = m[2].strip()
-            continue
-        if not current_sent["entity"]:
-            current_sent["entity"] = current_doc["entity"].Segment(
-                **{
-                    x.replace("sent_id", "sent").replace("text", "original"): y
-                    for x, y in current_sent["attributes"].items()
-                    if x not in ("start", "end")
-                }
-            )
-        token_id, form, lemma, upos, xpos, feats, head, deprel, deps, misc = [
-            "" if x == "_" else x.strip() for x in line.split("\t")
-        ]
-        if "-" in token_id:
-            current_sent["mwu"].append((misc, form, token_id.split("-")))
-        else:
-            feats_obj = get_obj(feats)
-            misc_obj = get_obj(misc)
-            kwargs: dict = {}
-            if lemma:
-                kwargs["lemma"] = lemma
-            if upos:
-                kwargs["upos"] = upos
-            if xpos:
-                kwargs["xpos"] = xpos
-            if feats_obj:
-                kwargs["feats"] = feats_obj
-            if misc_obj:
-                kwargs["misc"] = misc_obj
-            current_sent["tokens"][token_id] = {
-                "head": head,
-                "deprel": deprel,
-                "entity": current_sent["entity"].Token(
-                    form,
-                    **kwargs,
-                ),
-            }
-    process_sent(c, current_sent)
-    current_doc["entity"].make()
-    c.make(TMP_FOLDER)
-    print("Corpus created")
-
-
-conllu_str = """# newdoc id = unine15a01m
+def test_conllu_corpus_creation():
+    """Test creating a corpus from CONLLU data."""
+    shutil.rmtree(TMP_FOLDER, ignore_errors=True)
+    os.makedirs(TMP_FOLDER, exist_ok=True)
+    
+    conllu_str = """# newdoc id = unine15a01m
 # newdoc audio = unine15a01m.mp3
 # newdoc end = 715.19
 # newdoc filename = unine15a01m.xml
@@ -235,9 +164,83 @@ conllu_str = """# newdoc id = unine15a01m
 22	surtout	surtout	_	ADV	_	_	_	_	start=15.56|end=15.92
 23	un	un	_	DET	_	_	_	_	agreement=ms|start=15.92|end=16.03
 24	belge	belge	_	ADJ	_	_	_	_	agreement=ms:fs|start=16.03|end=16.28"""
-
-
-create_corpus(conllu_str)
-conf = json.loads(open(os.path.join(TMP_FOLDER, "config.json"), "r").read())
-checker = Checker(conf)
-checker.run_checks(TMP_FOLDER, full=True, add_zero=False)
+    
+    c = Corpus("my test conllu corpus")
+    current_doc: dict = {"attributes": {}, "entity": None}
+    current_sent: dict = {"attributes": {}, "entity": None, "tokens": {}, "mwu": []}
+    for line in conllu_str.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("# newdoc "):
+            attr, val = line[9:].split("=", 2)
+            if attr == "id":
+                if current_doc["entity"]:
+                    current_doc["entity"].make()
+                current_doc = {"attributes": {}, "entity": None}
+            current_doc["attributes"][attr.strip()] = val.strip()
+            continue
+        if line.startswith("# sent_id "):
+            if current_sent["entity"]:
+                process_sent(c, current_sent)
+            assert current_doc, RuntimeError(
+                "Encountered a new sentence before a new document"
+            )
+            current_doc["entity"] = c.Document(
+                **{
+                    x.replace("id", "docid"): y
+                    for x, y in current_doc["attributes"].items()
+                    if x not in ("start", "end")
+                }
+            )
+            current_sent = {"attributes": {}, "entity": None, "tokens": {}, "mwu": []}
+        if m := re.match(r"# ([^=]+)=(.+)$", line):
+            if m[1].strip() and m[2].strip():
+                current_sent["attributes"][m[1].strip()] = m[2].strip()
+            continue
+        if not current_sent["entity"]:
+            current_sent["entity"] = current_doc["entity"].Segment(
+                **{
+                    x.replace("sent_id", "sent").replace("text", "original"): y
+                    for x, y in current_sent["attributes"].items()
+                    if x not in ("start", "end")
+                }
+            )
+        token_id, form, lemma, upos, xpos, feats, head, deprel, deps, misc = [
+            "" if x == "_" else x.strip() for x in line.split("\t")
+        ]
+        if "-" in token_id:
+            current_sent["mwu"].append((misc, form, token_id.split("-")))
+        else:
+            feats_obj = get_obj(feats)
+            misc_obj = get_obj(misc)
+            kwargs: dict = {}
+            if lemma:
+                kwargs["lemma"] = lemma
+            if upos:
+                kwargs["upos"] = upos
+            if xpos:
+                kwargs["xpos"] = xpos
+            if feats_obj:
+                kwargs["feats"] = feats_obj
+            if misc_obj:
+                kwargs["misc"] = misc_obj
+            current_sent["tokens"][token_id] = {
+                "head": head,
+                "deprel": deprel,
+                "entity": current_sent["entity"].Token(
+                    form,
+                    **kwargs,
+                ),
+            }
+    process_sent(c, current_sent)
+    current_doc["entity"].make()
+    c.make(TMP_FOLDER)
+    
+    # Validate the generated files
+    conf = json.loads(open(os.path.join(TMP_FOLDER, "config.json"), "r").read())
+    checker = Checker(conf)
+    checker.run_checks(TMP_FOLDER, full=True, add_zero=False)
+    
+    # Clean up
+    shutil.rmtree(TMP_FOLDER, ignore_errors=True)

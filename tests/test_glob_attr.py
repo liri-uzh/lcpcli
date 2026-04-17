@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import pytest
 
 from lcpcli.builder import *
 from lcpcli.check_files import Checker
@@ -10,9 +11,10 @@ TMP_FOLDER = os.path.join(os.path.dirname(__file__), "tmp_data")
 # global attributes need to be created first, then they can be referenced
 
 
-def create_corpus():
-    shutil.rmtree(TMP_FOLDER)
-    os.makedirs(TMP_FOLDER)
+def test_glob_attr_corpus_creation():
+    """Test creating a corpus with global attributes."""
+    shutil.rmtree(TMP_FOLDER, ignore_errors=True)
+    os.makedirs(TMP_FOLDER, exist_ok=True)
     c = Corpus("my test corpus")
     p1 = c.Person(
         {
@@ -41,10 +43,11 @@ def create_corpus():
     d = c.Document(s1, s2, title="only document")
     d.make()
     c.make(TMP_FOLDER)
-    print("Corpus created")
-
-
-create_corpus()
-conf = json.loads(open(os.path.join(TMP_FOLDER, "config.json"), "r").read())
-checker = Checker(conf)
-checker.run_checks(TMP_FOLDER, full=True, add_zero=False)
+    
+    # Validate the generated files
+    conf = json.loads(open(os.path.join(TMP_FOLDER, "config.json"), "r").read())
+    checker = Checker(conf)
+    checker.run_checks(TMP_FOLDER, full=True, add_zero=False)
+    
+    # Clean up
+    shutil.rmtree(TMP_FOLDER, ignore_errors=True)
