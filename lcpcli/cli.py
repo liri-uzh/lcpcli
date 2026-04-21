@@ -115,6 +115,27 @@ def _parse_cmd_line():
                 **BOOL_KWARGS,
             )
             parser.add_argument(
+                "--force-corpus-overwrite",
+                required=False,
+                default=False,
+                help="Will overwrite any corpus with the same name in the destination collection.",
+                **BOOL_KWARGS,
+            )
+            parser.add_argument(
+                "--force-output-overwrite",
+                required=False,
+                default=False,
+                help="Will overwrite any file in the destination folder with the same names as the newly generated ones.",
+                **BOOL_KWARGS,
+            )
+            parser.add_argument(
+                "--conll-only",
+                required=False,
+                default=False,
+                help="Used in conjunction with -i/-o, will ignore any file not ending in .conll/.conllu from the input directory.",
+                **BOOL_KWARGS,
+            )
+            parser.add_argument(
                 "-v",
                 "--version",
                 required=False,

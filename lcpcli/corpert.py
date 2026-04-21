@@ -60,13 +60,17 @@ class Corpert:
         """
         return self.run(*args, **kwargs)
 
-    def run(self):
+    def run(self, conll_only: bool = False, overwite_output: bool = False):
         """
         The main routine: read in all input files and print/write them
         """
 
-        if next(
-            (f for f in os.listdir(self.output) if f.endswith((".json", ".csv"))), None
+        assert self.output and os.path.isdir(self.output), FileNotFoundError(
+            f"The output directory {self.output} is invalid."
+        )
+
+        if not overwite_output and any(
+            f.endswith((".json", ".csv")) for f in os.listdir(self.output)
         ):
             print(
                 f"The destination folder {self.output} contains some JSON and/or CSV files which this operation might overwrite. Do you want to proceed?"
@@ -105,8 +109,10 @@ class Corpert:
             )
         ]
 
-        if any(f.lower().endswith((".conllu", ".conll")) for f in doc_files) and any(
-            not f.lower().endswith((".conllu", ".conll")) for f in doc_files
+        if (
+            not conll_only
+            and any(f.lower().endswith((".conllu", ".conll")) for f in doc_files)
+            and any(not f.lower().endswith((".conllu", ".conll")) for f in doc_files)
         ):
             print(
                 f"The input folder ({self._path}) contains both files with a CoNLL extension and files with a different extension."

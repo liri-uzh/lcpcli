@@ -58,6 +58,7 @@ def lcp_upload(
     delimiter: str = "",
     quote: str = "",
     escape: str = "",
+    force_corpus_overwrite: bool = False,
 ) -> None:
 
     filt = None
@@ -232,6 +233,8 @@ def lcp_upload(
             corpus_name = (
                 template_data.get("meta", {}).get("name", "") if template_data else ""
             )
+            if force_corpus_overwrite:
+                continue
             print(
                 f"Do you want to overwrite the existing corpus {corpus_name} (#{overwrite_id}) with this one?"
             )

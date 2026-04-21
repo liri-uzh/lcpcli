@@ -65,7 +65,9 @@ then `lcpcli -c {output_path} -k $API_KEY -s $API_SECRET -p $PROJECT_NAME --live
         if cont := self.kwargs.get("content"):
             self.kwargs["content"] = os.path.abspath(cont)
             corpert = Corpert(**self._get_kwargs(Corpert.__init__))
-            corpert.run()
+            conll_only = self.kwargs.get("conll_only", False)
+            overwrite_output = self.kwargs.get("force_output_overwrite", False)
+            corpert.run(conll_only, overwrite_output)
 
         if not upload and not self.kwargs["check_only"]:
             print("No upload key or secret passed, exiting now.")
