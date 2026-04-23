@@ -136,6 +136,13 @@ def _parse_cmd_line():
                 **BOOL_KWARGS,
             )
             parser.add_argument(
+                "--skip-check",
+                required=False,
+                default=False,
+                help="Skip the local checks before uploading the corpus (the server may still run checks).",
+                **BOOL_KWARGS,
+            )
+            parser.add_argument(
                 "-v",
                 "--version",
                 required=False,

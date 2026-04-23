@@ -132,21 +132,27 @@ then `lcpcli -c {output_path} -k $API_KEY -s $API_SECRET -p $PROJECT_NAME --live
                 ("", ""),
             )
         )
-        tok = conf["firstClass"]["token"]
-        n_tokens = {"n": 0}
-        n_tokens_callback: Callable = lambda c, h, f, *_: n_tokens.__setitem__(
-            "n", n_tokens["n"] + (1 if f.startswith(tok.lower() + ".") else 0)
-        )
-        callback: Callable = lambda c, h, f, *_: n_tokens_callback(
-            c, h, f, *_
-        ) or no_index_callback(c, h, f, *_)
-        checker.run_checks(
-            self.kwargs["corpus"], full=True, add_zero=False, callback=callback
-        )
-        self.kwargs["n_batches"] = max(1, ceil(log2(n_tokens["n"] / 1e6)))
-        self.kwargs["no_index"] = [
-            [lay, attr] for lay, attr in no_index if lay and attr
-        ]
+        if self.kwargs.get("skip_check"):
+            print("Warning: not running checks on the corpus.")
+            print(
+                "Some optimization procedures only apply when checking the corpus; skipping the checks might produced a sub-optimized corpus."
+            )
+        else:
+            tok = conf["firstClass"]["token"]
+            n_tokens = {"n": 0}
+            n_tokens_callback: Callable = lambda c, h, f, *_: n_tokens.__setitem__(
+                "n", n_tokens["n"] + (1 if f.startswith(tok.lower() + ".") else 0)
+            )
+            callback: Callable = lambda c, h, f, *_: n_tokens_callback(
+                c, h, f, *_
+            ) or no_index_callback(c, h, f, *_)
+            checker.run_checks(
+                self.kwargs["corpus"], full=True, add_zero=False, callback=callback
+            )
+            self.kwargs["n_batches"] = max(1, ceil(log2(n_tokens["n"] / 1e6)))
+            self.kwargs["no_index"] = [
+                [lay, attr] for lay, attr in no_index if lay and attr
+            ]
         return lcp_upload(**self._get_kwargs(lcp_upload))
 
 

@@ -59,6 +59,7 @@ def lcp_upload(
     quote: str = "",
     escape: str = "",
     force_corpus_overwrite: bool = False,
+    skip_check: bool = False,
 ) -> None:
 
     filt = None
@@ -184,7 +185,6 @@ def lcp_upload(
                 if media_ncol < 0:
                     media_ncol = next(n for n, col in enumerate(cols) if col == "media")
                     continue
-                print("media_col", cols[media_ncol])
                 media_obj = json.loads(cols[media_ncol])
                 for media_name, media_attr in has_media.items():
                     if media_attr.get("isOptional"):
@@ -199,7 +199,8 @@ def lcp_upload(
                     )
 
     if check_only:
-        print("Checks over.")
+        if not skip_check:
+            print("Checks over.")
         return
 
     default = "vian" if vian else "lcp"
