@@ -18,6 +18,8 @@ ATYPES_LOOKUP = ("text", "dict", "labels")
 NAMEDATALEN = 63
 PATTERN_TXT = "(must start with a lower case, be at leat 2 characters long and only contain alpha-numerical characters)"
 
+IS_NUM = re.compile(r"^[0-9]+(\.[0-9]+)?$")
+
 
 def meta_subattr(meta: dict, k: str, v: Any) -> dict:
     """
@@ -26,11 +28,7 @@ def meta_subattr(meta: dict, k: str, v: Any) -> dict:
     sub_attr = meta.setdefault(k, {})
     if isinstance(v, list):
         sub_attr["type"] = "labels"
-    elif (
-        isinstance(v, (int, float))
-        or isinstance(v, str)
-        and v.replace(".", "", 1).isdigit()
-    ):
+    elif isinstance(v, (int, float)) or isinstance(v, str) and IS_NUM.match(v):
         sub_attr["type"] = "text" if sub_attr.get("type") == "text" else "number"
     elif isinstance(v, dict):
         sub_attr["type"] = "dict"
@@ -387,7 +385,11 @@ class Corpus:
                 if ais_global:
                     aopts["isGlobal"] = True
                 if aopts["type"] == "categorical" and not ais_global:
-                    aopts["values"] = [str(v) for v in mapping.lookups[aname] if v]
+                    aopts["values"] = [
+                        str(v)
+                        for v in mapping.lookups[aname]
+                        if v is not None and v != ""
+                    ]
                 elif aopts["type"] == "ref":
                     aopts.pop("type")
                     aopts.pop("nullable", "")
@@ -594,13 +596,17 @@ class Layer:
             rows.append(v)
         # Add any new attribute to mapping
         for aname, attr in self._attributes.items():
-            if aname in mapping.attributes:
-                try:
-                    mapping.attributes[aname]["subtype"] = attr._subtype
-                except:
-                    pass
-                continue
             atype = attr._type
+            if aname in mapping.attributes:
+                mattr = mapping.attributes[aname]
+                if atype == "text" and mattr["type"] != atype:
+                    mattr["type"] = "text"
+                else:
+                    try:
+                        mapping.attributes[aname]["subtype"] = attr._subtype
+                    except:
+                        pass
+                continue
             mapping.attributes[aname] = {
                 "type": atype,
                 "nullable": (

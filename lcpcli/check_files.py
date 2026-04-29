@@ -1,16 +1,18 @@
 import csv
 import json
 import os
+import re
 import sys
 
 from jsonschema import validate
-from re import match, findall
 from typing import Callable
 from uuid import UUID
 
 EXTENSIONS = (".csv", ".tsv")
 LOOKUP_TYPES = ("dict", "text")
 NAMEDATALEN = 63
+
+IS_NUM = re.compile(r"^[0-9]+(\.[0-9]+)?$")
 
 
 def is_lookup(p: dict) -> bool:
@@ -86,16 +88,16 @@ class Checker:
         assert UUID(uuid, version=4), SyntaxError(f"Invalid UUID ({uuid})")
 
     def check_number(self, value: str, aname: str = "") -> None:
-        is_digit = value.strip().isdigit()
-        is_almost_digit = not is_digit and value.strip().replace(".", "", 1).isdigit()
-        if is_almost_digit:
+        is_num = IS_NUM.match(value.strip())
+        is_float = is_num and "." in value
+        if is_float:
             raise TypeError(
                 f"Number attribute {aname} appears to contain floating values ({value}); add 'subtype': 'float' to its properties."
             )
-        assert is_digit, TypeError(f"Number attribute {aname} is ill-formed: {value}")
+        assert is_num, TypeError(f"Number attribute {aname} is ill-formed: {value}")
 
     def check_float(self, value: str, aname: str = "") -> None:
-        is_numerical = value.strip().replace(".", "", 1).isdigit()
+        is_numerical = IS_NUM.match(value.strip())
         assert is_numerical, TypeError(
             f"Float number attribute {aname} is ill-formed: {value}"
         )
@@ -122,7 +124,7 @@ class Checker:
                     assert (
                         isinstance(v, (int, float))
                         or isinstance(v, str)
-                        and v.replace(".", "", 1).isdigit()
+                        and IS_NUM.match(v)
                     ), TypeError(f"Sub-attribute {k} is not a number ({v})")
                 elif typ in ("labels", "array"):
                     assert isinstance(v, list), TypeError(
@@ -140,7 +142,7 @@ class Checker:
         return None
 
     def check_labels(self, bits: str, nbit: int) -> None:
-        assert match(r"^[01]*$", bits), ValueError(
+        assert re.match(r"^[01]*$", bits), ValueError(
             f"Labels column should be series of 0s and 1s, got '{bits}'"
         )
         assert len(bits) == nbit, ValueError(
@@ -151,25 +153,25 @@ class Checker:
     def check_ftsvector(self, vector: str) -> None:
         whole_pattern = r"^('\d+([^']|'')*':\d+(,\d+)*(\s|$))+$"
         simple_unit_pattern = r"('([^']|'')*':[^\s]+)(\s|$)"
-        units = findall(simple_unit_pattern, vector)
+        units = re.findall(simple_unit_pattern, vector)
         for n, (unit, *_) in enumerate(units):
             assert unit.startswith("'"), SyntaxError(
                 f"Each value in the tsvector must start with a single quote character ({unit} -- {n})"
             )
-            assert match(r"'\d+", unit), SyntaxError(
+            assert re.match(r"'\d+", unit), SyntaxError(
                 f"Each value in the tsvector must start with a single quote character followed by an integer index ({unit} -- {n})"
             )
-            m = match(r"'\d+(.*)':\d+(,\d+)*\s?$", unit)
+            m = re.match(r"'\d+(.*)':\d+(,\d+)*\s?$", unit)
             assert m, SyntaxError(
                 f"Each value in the tsvector must end with a single quote followed by a colon and an integer index ({unit} -- {n})"
             )
-        assert match(whole_pattern, vector), SyntaxError(
+        assert re.match(whole_pattern, vector), SyntaxError(
             f"Invalid tsvector string ({vector})"
         )
         return None
 
     def check_range(self, range: str, name: str) -> None:
-        m = match(r"\[(\d+),(\d+)\)", range)
+        m = re.match(r"\[(\d+),(\d+)\)", range)
         assert m, SyntaxError(f"Range '{name}' not in the right format: {range}")
         l, u = (m[1], m[2])
         try:
@@ -192,7 +194,7 @@ class Checker:
         return None
 
     def check_xy_box(self, xy_box: str, name: str) -> None:
-        m = match(r"\((\d+),(\d+)\),\((\d+),(\d+)\)", xy_box)
+        m = re.match(r"\((\d+),(\d+)\),\((\d+),(\d+)\)", xy_box)
         assert m, SyntaxError(f"Range '{name}' not in the right format: {xy_box}")
         x1, y1, x2, y2 = (m[1], m[2], m[3], m[4])
         try:

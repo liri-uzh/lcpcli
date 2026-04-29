@@ -19,6 +19,8 @@ CONLLU_COLUMNS = (
     "MISC",
 )
 
+IS_NUM = re.compile(r"^[0-9]+(\.[0-9]+)?$")
+
 
 class LayerProxy:
     dummy_corpus = Corpus("dummy")
@@ -36,10 +38,8 @@ class LayerProxy:
         val = value
         if isinstance(value, str):
             val = value.strip()
-            if val.isdigit():
-                val = int(val)
-            elif val.replace(".", "", 1).isdigit():
-                val = float(val)
+            if IS_NUM.match(val):
+                val = float(val) if "." in val else int(val)
         self.attributes[name.strip()] = val
 
 
@@ -214,10 +214,8 @@ def create_corpus(
                 kwargs: dict = {}
                 for n, x in enumerate(column_names[2:]):
                     kwargs[x] = rest[n]
-                    if rest[n].isdigit():
-                        kwargs[x] = int(rest[n])
-                    elif rest[n].replace(".", "", 1).isdigit():
-                        kwargs[x] = float(rest[n])
+                    if IS_NUM.match(rest[n]):
+                        kwargs[x] = float(rest[n]) if "." in rest[n] else int(rest[n])
                 if "feats" in column_names:
                     feats_idx = column_names.index("feats")
                     feats_str = rest[feats_idx - 2]
@@ -234,7 +232,8 @@ def create_corpus(
                             0 if kwargs["misc"].pop("SpaceAfter") == "No" else 1
                         )
                 token_proxy = TokenProxy()
-                if "head" in kwargs:
+                head_val = kwargs.get("head", "")
+                if head_val and head_val != "_":
                     token_proxy.head = str(int(kwargs.pop("head")))
                 if "deprel" in kwargs:
                     token_proxy.deprel = kwargs.pop("deprel")
@@ -251,11 +250,9 @@ def create_corpus(
             current_doc.entity.make()
         print("Corpus created")
     except Exception as e:
-        raise RuntimeError(
-            f"""Error when creating the corpus:
+        raise RuntimeError(f"""Error when creating the corpus:
             {str(e)}
-            Are all input files valid CoNLL-U files?"""
-        )
+            Are all input files valid CoNLL-U files?""")
     return c
 
 
