@@ -496,7 +496,39 @@ class Layer:
             ch.append(c)
         return ch
 
-    def make(self):
+    def _update_parents_anchors(self):
+        """Update the anchors of all the parents (recursively)"""
+        if not self._made:
+            return
+        corpus = self._corpus
+        parents = self._parents
+        while parents:
+            current_parents = [*parents]
+            parents = []
+            for parent in current_parents:
+                parents += parent._parents
+                for anc_name, anchors in self._anchorings.items():
+                    if anc_name not in parent._anchorings:
+                        parent._anchorings[anc_name] = [*anchors]
+                    parent_anchors = parent._anchorings[anc_name]
+                    if anchors[0] < parent_anchors[0]:
+                        parent_anchors[0] = anchors[0]
+                    if anc_name == "time" and parent._name == corpus._document:
+                        if corpus._upperFrameDocument < parent_anchors[0]:
+                            parent_anchors[0] = corpus._upperFrameDocument
+                        corpus._upperFrameDocument = parent_anchors[1]
+                    if anc_name != "location":
+                        if anchors[1] > parent_anchors[1]:
+                            parent_anchors[1] = anchors[1]
+                        continue
+                    if anchors[1] < parent_anchors[1]:
+                        parent_anchors[1] = anchors[1]
+                    if anchors[2] > parent_anchors[2]:
+                        parent_anchors[2] = anchors[2]
+                    if anchors[3] > parent_anchors[3]:
+                        parent_anchors[3] = anchors[3]
+
+    def make(self, clear=False):
         if self._made:
             return
         corpus = self._corpus
@@ -530,35 +562,8 @@ class Layer:
             )
             self._anchorings["stream"] = [char_low, corpus._char_counter]
         elif self._contains:
-            unset_anchorings = {a for a in ANCHORINGS if not self._anchorings.get(a)}
             for child in self._contains:
                 child.make()
-                if child._name not in mapping.contains:
-                    mapping.contains.append(child._name)
-                # Anchorings
-                for a in unset_anchorings:
-                    if a not in child._anchorings:
-                        continue
-                    child_a = child._anchorings[a]
-                    if a not in self._anchorings:
-                        self._anchorings[a] = [*child_a]
-                    self_a = self._anchorings[a]
-                    if child_a[0] < self_a[0]:
-                        self_a[0] = child_a[0]
-                    if a == "time" and self._name == corpus._document:
-                        if corpus._upperFrameDocument < self_a[0]:
-                            self_a[0] = corpus._upperFrameDocument
-                        corpus._upperFrameDocument = self_a[1]
-                    if a != "location":
-                        if child_a[1] > self_a[1]:
-                            self_a[1] = child_a[1]
-                        continue
-                    if child_a[1] < self_a[1]:
-                        self_a[1] = child_a[1]
-                    if child_a[2] > self_a[2]:
-                        self_a[2] = child_a[2]
-                    if child_a[3] > self_a[3]:
-                        self_a[3] = child_a[3]
             if is_segment:
                 tokens = [
                     ch._attributes.values()
@@ -696,6 +701,12 @@ class Layer:
             rows.append("" if val == None else str(val))
         mapping.csvs["_main"].writerow(rows)
         self._made = True
+        self._update_parents_anchors()
+        if clear:
+            # Prepare for deletion: no pointers to other layers/global attributes
+            self._parents = []
+            self._contains = []
+            self._attributes = {}
         return self
 
     def set_time(self, *args):
@@ -758,6 +769,7 @@ class Layer:
         for layer in layers:
             if self not in layer._parents:
                 layer._parents.append(self)
+            layer._update_parents_anchors()
         return self
 
 
