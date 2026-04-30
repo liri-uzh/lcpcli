@@ -528,6 +528,14 @@ class Layer:
                     if anchors[3] > parent_anchors[3]:
                         parent_anchors[3] = anchors[3]
 
+    def clear(self):
+        if not self._made:
+            return
+        # Prepare for deletion: no pointers to other layers/global attributes
+        self._parents = []
+        self._contains = []
+        self._attributes = {}
+
     def make(self, clear=False):
         if self._made:
             return
@@ -703,10 +711,7 @@ class Layer:
         self._made = True
         self._update_parents_anchors()
         if clear:
-            # Prepare for deletion: no pointers to other layers/global attributes
-            self._parents = []
-            self._contains = []
-            self._attributes = {}
+            self.clear()
         return self
 
     def set_time(self, *args):
