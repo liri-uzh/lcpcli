@@ -111,6 +111,7 @@ class Checker:
         )
 
     def check_dict(self, str_obj: str, subtyps: dict) -> None:
+        error = ""
         try:
             json_obj = json.loads(str_obj)
             assert isinstance(json_obj, dict), TypeError(
@@ -134,10 +135,11 @@ class Checker:
                     assert isinstance(v, str), TypeError(
                         f"Sub-attribute {k} is not a valid text value ({v})"
                     )
-        except:
+        except Exception as e:
             json_obj = None
+            error = str(e)
         assert isinstance(json_obj, dict), SyntaxError(
-            f"Invalid syntax for dict entry ({str_obj})"
+            f"Invalid syntax for dict entry ({str_obj})\n{error}"
         )
         return None
 
