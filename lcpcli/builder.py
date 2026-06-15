@@ -46,6 +46,7 @@ def get_layer_method(layer: "Layer"):
             corpus._layers.pop(layer._name, "")
             fname = f"{layer._name.lower()}.csv"
             corpus._files[fname].close()
+            os.unlink(corpus._files[fname].name)
             corpus._files.pop(fname)
             return GlobalAttribute(corpus, layer._name, args[0])
         largs = [a for a in args]
