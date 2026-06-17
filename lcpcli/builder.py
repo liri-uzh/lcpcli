@@ -338,7 +338,7 @@ class Corpus:
                 "corpusDescription": self._corpus_description,
                 "date": self._date,
                 "url": self._url,
-                "revision": 1,
+                "revision": self._revision,
             },
             "firstClass": {
                 "token": self._token,
