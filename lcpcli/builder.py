@@ -450,8 +450,7 @@ class Layer:
         if re.match(r"[A-Z]", name):
             corpus = self._corpus
             layer = corpus._add_layer(name)
-            self._contains.append(layer)
-            layer._parents.append(self)
+            self.add(layer)
             return get_layer_method(layer)
         return super().__getattribute__(name)
 
@@ -772,7 +771,10 @@ class Layer:
             l._name == self._contains[0]._name for l in layers
         ), RuntimeError("All the children of a layer must be of the same type")
         self._contains += layers
+        mapping = self._corpus._layers[self._name]
         for layer in layers:
+            if layer._name not in mapping.contains:
+                mapping.contains.append(layer._name)
             if self not in layer._parents:
                 layer._parents.append(self)
             layer._update_parents_anchors()
