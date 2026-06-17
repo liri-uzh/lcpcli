@@ -4,11 +4,9 @@ import shutil
 from collections.abc import Callable
 from inspect import signature
 from json import loads
-from math import ceil, log2
 from typing import Any
 
 from . import __version__
-from .check_files import Checker
 from .corpert import Corpert
 from .lcp_upload import lcp_upload
 from .cli import _parse_cmd_line
@@ -103,56 +101,6 @@ then `lcpcli -c {output_path} -k $API_KEY -s $API_SECRET -p $PROJECT_NAME --live
         if not self.kwargs.get("corpus"):
             raise ValueError("No corpus found to upload")
 
-        json_file = find_config_file(self.kwargs["corpus"])
-        conf: dict[str, Any] = loads(open(json_file, "r", encoding="utf-8").read())
-        checker = Checker(
-            conf,
-            quote=self.kwargs.get("quote") or '"',
-            delimiter=self.kwargs.get("delimiter") or ",",
-            escape=self.kwargs.get("escape") or None,
-        )
-        text_attrs: list[tuple[str, str]] = [
-            (lay, attr)
-            for lay, props in conf["layer"].items()
-            for attr in {
-                aname
-                for aname, ameta in props.get("attributes", {}).items()
-                if ameta.get("type") == "text"
-            }
-        ]
-        no_index: set[tuple[str, str]] = set()
-        no_index_callback: Callable = lambda c, h, f, *_: no_index.add(
-            next(
-                (
-                    (lay, attr)
-                    for lay, attr in text_attrs
-                    if f.startswith(f"{lay}_{attr}.".lower())
-                    and len(c[h.index(attr)]) > 2000
-                ),
-                ("", ""),
-            )
-        )
-        if self.kwargs.get("skip_check"):
-            print("Warning: not running checks on the corpus.")
-            print(
-                "Some optimization procedures only apply when checking the corpus; skipping the checks might produced a sub-optimized corpus."
-            )
-        else:
-            tok = conf["firstClass"]["token"]
-            n_tokens = {"n": 0}
-            n_tokens_callback: Callable = lambda c, h, f, *_: n_tokens.__setitem__(
-                "n", n_tokens["n"] + (1 if f.startswith(tok.lower() + ".") else 0)
-            )
-            callback: Callable = lambda c, h, f, *_: n_tokens_callback(
-                c, h, f, *_
-            ) or no_index_callback(c, h, f, *_)
-            checker.run_checks(
-                self.kwargs["corpus"], full=True, add_zero=False, callback=callback
-            )
-            self.kwargs["n_batches"] = max(1, ceil(log2(n_tokens["n"] / 1e6)))
-            self.kwargs["no_index"] = [
-                [lay, attr] for lay, attr in no_index if lay and attr
-            ]
         return lcp_upload(**self._get_kwargs(lcp_upload))
 
 

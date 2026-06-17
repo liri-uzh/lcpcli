@@ -7,16 +7,27 @@ import json
 import os
 import re
 import sys
+import tempfile
 import time
 
+from collections.abc import Callable
 from typing import Any, cast
 
 import requests
 
 from tqdm import tqdm
+from math import ceil, log2
+
+from .check_files import Checker
 
 from .cli import _parse_cmd_line
-from .utils import get_file_from_base
+from .utils import (
+    find_config_file,
+    default_json,
+    get_file_from_base,
+    is_valid_zip,
+    COMPRESSED_EXTENSIONS,
+)
 
 # CREATE_URL = "https://lcp.test.linguistik.uzh.ch/create"
 # UPLOAD_URL = "https://lcp.test.linguistik.uzh.ch/upload"
@@ -27,7 +38,7 @@ VALID_EXTENSIONS = (
     "csv",
     "tsv",
 )
-COMPRESSED_EXTENSIONS = ("zip", "tar", "tar.gz", "tar.xz", "7z")
+
 AUDIOVIDEO_EXTENSIONS = ("mp3", "mp4", "wav", "ogg")
 IMAGE_EXTENSIONS = ("png", "jpg", "jpeg", "bmp")
 
@@ -54,7 +65,6 @@ def lcp_upload(
     provided_url: str = "",
     check_only: bool = False,
     n_batches: int = 10,
-    no_index: list[list[str]] = [],
     delimiter: str = "",
     quote: str = "",
     escape: str = "",
@@ -66,12 +76,9 @@ def lcp_upload(
     # delete_template = False
     template_data = None
 
-    if os.path.isfile(corpus):
-        if not corpus.endswith(COMPRESSED_EXTENSIONS):
-            ext = ", ".join(COMPRESSED_EXTENSIONS)
-            print(
-                f"If corpus is a file, it must have one of the following extensions: {ext}"
-            )
+    is_zip, is_valid = is_valid_zip(corpus)
+    if is_zip:
+        if not is_valid:
             return
         base = os.path.dirname(corpus)
         filt = os.path.basename(base)
@@ -106,46 +113,109 @@ def lcp_upload(
         print(
             "Warning: no template specified and corpus is not a directory. Looking inside archive..."
         )
-        from tarfile import TarFile, is_tarfile
+        import tarfile
         from zipfile import ZipFile, is_zipfile
         from py7zr import SevenZipFile, is_7zfile
 
-        ziptar = [
-            (".zip", is_zipfile, ZipFile, "namelist"),
-            (".tar", is_tarfile, TarFile, "getnames"),
-            (".tar.gz", is_tarfile, TarFile, "getnames"),
-            (".tar.xz", is_tarfile, TarFile, "getnames"),
-            (".7z", is_7zfile, SevenZipFile, "getnames"),
+        ziptar: list[tuple[str, Callable, Callable, str, str]] = [
+            (".zip", is_zipfile, ZipFile, "namelist", "r"),
+            (".tar", tarfile.is_tarfile, tarfile.open, "getnames", "r"),
+            (".tar.gz", tarfile.is_tarfile, tarfile.open, "getnames", "r:gz"),
+            (".tar.xz", tarfile.is_tarfile, tarfile.open, "getnames", "r"),
+            (".7z", is_7zfile, SevenZipFile, "getnames", "r"),
         ]
         found = False
-        for ext, check, opener, method in ziptar:
+        for ext, check, opener, method, mode in ziptar:
             if not corpus.endswith(ext):
                 continue
             if not check(corpus):
                 print(f"Problem with archive: {corpus}")
                 return
-            with opener(corpus, "r") as compressed:
+            with opener(corpus, mode) as compressed:
                 for f in getattr(compressed, method)():
                     if not f.endswith(".json"):
                         continue
-                    found = True
-                    print(f"Using {f} from archive as template file...")
-                    dest = "."
-                    if ext != ".7z":
-                        compressed.extract(f, dest)
-                    else:
-                        compressed.extract(dest, [f])
-                    template = f
-                    # delete_template = True
+                    try:
+                        with tempfile.TemporaryDirectory() as dest:
+                            if ext != ".7z":
+                                compressed.extract(f, dest)
+                            else:
+                                compressed.extract(dest, [f])
+                            template = find_config_file(dest)
+                            template_data = json.loads(
+                                open(template or "", "r", encoding="utf-8").read()
+                            )
+                            template = f
+                            found = True
+                            print(f"Using {f} from archive as template file...")
+                        break
+                    except:
+                        pass
             if not found:
                 print(f"Error: no JSON files found in archive: {corpus}")
                 return
     elif not template and os.path.isdir(corpus):
-        template = next((i for i in os.listdir(corpus) if i.endswith(".json")), None)
-        if template is None:
-            print("Error: no template specified and no JSON found in corpus directory.")
-            return
-        template = os.path.join(corpus, template)
+        template = find_config_file(corpus)
+
+    if not template_data:
+        try:
+            template_data = json.loads(
+                open(template or "", "r", encoding="utf-8").read()
+            )
+        except:
+            print("Cannot find a template file, using a default configuration")
+            template_data = default_json(
+                next(reversed(base.split(os.path.sep))) or "Unnamed corpus"
+            )
+
+    checker = Checker(template_data, quote=quote, delimiter=delimiter, escape=escape)
+    text_attrs: list[tuple[str, str]] = [
+        (lay, attr)
+        for lay, props in template_data["layer"].items()
+        for attr in {
+            aname
+            for aname, ameta in props.get("attributes", {}).items()
+            if ameta.get("type") == "text"
+        }
+    ]
+    no_index: set[tuple[str, str]] | list[list[str]] = set()
+    no_index_callback: Callable = lambda c, h, f, *_: cast(
+        set[tuple[str, str]], no_index
+    ).add(
+        next(
+            (
+                (lay, attr)
+                for lay, attr in text_attrs
+                if f.startswith(f"{lay}_{attr}.".lower())
+                and len(c[h.index(attr)]) > 2000
+            ),
+            ("", ""),
+        )
+    )
+    if is_zip:
+        print(
+            "Warning: not running checks on archives. Un-archive the corpus if you want to run checks."
+        )
+        print(
+            "Some optimization procedures only apply when checking the corpus; skipping the checks might produced a sub-optimized corpus."
+        )
+    elif skip_check:
+        print("Warning: not running checks on the corpus.")
+        print(
+            "Some optimization procedures only apply when checking the corpus; skipping the checks might produced a sub-optimized corpus."
+        )
+    else:
+        tok = template_data["firstClass"]["token"]
+        n_tokens = {"n": 0}
+        n_tokens_callback: Callable = lambda c, h, f, *_: n_tokens.__setitem__(
+            "n", n_tokens["n"] + (1 if f.startswith(tok.lower() + ".") else 0)
+        )
+        callback: Callable = lambda c, h, f, *_: n_tokens_callback(
+            c, h, f, *_
+        ) or no_index_callback(c, h, f, *_)
+        checker.run_checks(base, full=True, add_zero=False, callback=callback)
+        n_batches = max(1, ceil(log2(n_tokens["n"] / 1e6)))
+        no_index = [[lay, attr] for lay, attr in no_index if lay and attr]
 
     headers: dict[str, str | None] = {
         "Content-Type": None,
@@ -164,16 +234,16 @@ def lcp_upload(
     has_media = template_data and template_data.get("meta", {}).get("mediaSlots", {})
 
     if has_media:
-        assert os.path.isdir(corpus), NotImplementedError(
+        assert os.path.isdir(base), NotImplementedError(
             "Multimedia corpora must be in an unzipped folder"
         )
-        media_path = os.path.join(corpus, "media")
+        media_path = os.path.join(base, "media")
         assert os.path.isdir(media_path), NotImplementedError(
             "The media files should be placed inside a 'media' subfolder"
         )
         doc_name = cast(dict, template_data)["firstClass"]["document"]
-        doc_fn = get_file_from_base(doc_name, os.listdir(corpus))
-        with open(os.path.join(corpus, doc_fn), "r", encoding="utf-8") as doc_file:
+        doc_fn = get_file_from_base(doc_name, os.listdir(base))
+        with open(os.path.join(base, doc_fn), "r", encoding="utf-8") as doc_file:
             media_ncol = -1
             doc_csv = csv.reader(
                 doc_file,
@@ -218,7 +288,7 @@ def lcp_upload(
             url = provided_url
         url = url.removesuffix("/") + "/create"
         jso["n_batches"] = n_batches or 10
-        jso["no_index"] = no_index
+        jso["no_index"] = list(no_index)
         jso["overwrite"] = True if overwrite_id and overwrite_id > 0 else False
         resp = post(url, headers=headers, json=jso)  # type: ignore
         data = resp.json()

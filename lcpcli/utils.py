@@ -7,11 +7,25 @@ from datetime import date
 from jsonschema import validate
 from pathlib import Path
 
+COMPRESSED_EXTENSIONS = ("zip", "tar", "tar.gz", "tar.xz", "7z")
+
 
 def get_file_from_base(fn: str, files: list[str]) -> str:
     out_fn = next((f for f in files if Path(f).stem.lower() == fn.lower()), None)
     assert out_fn, FileNotFoundError(f"Could not find a file for {fn}")
     return out_fn
+
+
+def is_valid_zip(fn: str) -> tuple[bool, bool]:
+    if not os.path.isfile(fn):
+        return (False, False)
+    if not fn.endswith(COMPRESSED_EXTENSIONS):
+        ext = ", ".join(COMPRESSED_EXTENSIONS)
+        print(
+            f"If corpus is a file, it must have one of the following extensions: {ext}"
+        )
+        return (True, False)
+    return (True, True)
 
 
 def esc(
