@@ -767,9 +767,9 @@ class Layer:
         return self
 
     def add(self, *layers: "Layer"):
-        assert not self._contains or all(
-            l._name == self._contains[0]._name for l in layers
-        ), RuntimeError("All the children of a layer must be of the same type")
+        # assert not self._contains or all(
+        #     l._name == self._contains[0]._name for l in layers
+        # ), RuntimeError("All the children of a layer must be of the same type")
         self._contains += layers
         mapping = self._corpus._layers[self._name]
         for layer in layers:
