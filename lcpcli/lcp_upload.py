@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+
 import csv
+import hashlib
 import json
 import os
 import re
@@ -12,14 +14,15 @@ import time
 
 from collections.abc import Callable
 from typing import Any, cast
+from tusclient import client, uploader as tus_uploader
 
 import requests
 
 from tqdm import tqdm
 from math import ceil, log2
 
+from . import __version__
 from .check_files import Checker
-
 from .cli import _parse_cmd_line
 from .utils import (
     find_config_file,
@@ -43,6 +46,33 @@ AUDIOVIDEO_EXTENSIONS = ("mp3", "mp4", "wav", "ogg")
 IMAGE_EXTENSIONS = ("png", "jpg", "jpeg", "bmp")
 
 POST_SIZE_LIMIT = 10 * 1000000000  # in bytes
+
+
+class CustomUploader(tus_uploader.Uploader):
+    def __init__(self, *args, **kwargs):
+        headers = kwargs.pop("headers", {})
+        super().__init__(*args, **kwargs)
+        metadata = headers.pop("Upload-Metadata")
+        if metadata:
+            self.metadata = metadata
+        self.client.headers.update(headers)
+        self.last_post_headers = None
+
+    def _do_request(self):
+        super()._do_request()
+        try:
+            self.last_post_headers = self.request.response_headers
+        except:
+            pass
+
+    def upload(self, stop_at: int | None = None):
+        super().upload(stop_at=stop_at)
+        return self.last_post_headers
+
+
+class CustomTusClient(client.TusClient):
+    def uploader(self, *args, **kwargs):
+        return CustomUploader(*args, client=self, **kwargs)
 
 
 def post(*args, **kwargs):
@@ -221,6 +251,7 @@ def lcp_upload(
         "Content-Type": None,
         "X-API-Key": api_key,
         "X-API-Secret": secret,
+        "X-LCPCLI-Version": str(__version__),
     }
 
     if not template_data and template:
@@ -319,7 +350,7 @@ def lcp_upload(
 
     if not ret:
         return
-    new_corpus_id = monitor_upload(*ret)
+    new_corpus_id = monitor_db_insert(*ret)
     if not new_corpus_id or new_corpus_id == 0:
         print("Upload failed, aborting now.")
         return
@@ -411,7 +442,7 @@ def send_media(
     media_type: str = "audio",
 ) -> tuple[str, str]:
     """
-    Poll /schema to check if schema is done, then send data
+    Send media files
     """
     project = data.get("project")
     target = data.get("target")
@@ -436,30 +467,42 @@ def send_media(
         f"No 'media' subfolder found at '{media_path}'"
     )
 
-    files = {
-        # os.path.splitext(p)[0]: open(os.path.join(media_path, p), "rb")
-        p: open(os.path.join(media_path, p), "rb")
-        for p in os.listdir(media_path)
-    }
+    files = [os.path.join(media_path, p) for p in os.listdir(media_path)]
     if not filt:
         filt = ""
     extensions = IMAGE_EXTENSIONS if media_type == "image" else AUDIOVIDEO_EXTENSIONS
-    files = {
-        k: v for k, v in files.items() if filt in k and k.lower().endswith(extensions)
-    }
+    files = [fp for fp in files if filt in fp and fp.lower().endswith(extensions)]
 
     print(f"Sending media ({media_type}) data...")
 
     url = CREATE_URL if live else CREATE_URL_TEST
     if provided_url:
         url = provided_url
-    url = url.removesuffix("/") + "/upload"
-    resp = post(url, params=jso, headers=headers, files=files)  # type: ignore
+    upload_url = url.removesuffix("/") + f"/upload"
+    tus_client = CustomTusClient(upload_url)
+    fn_md5 = hashlib.md5(
+        "".join(sorted(os.path.basename(fn) for fn in files)).encode()
+    ).hexdigest()
+    try:
+        for file_path in files:
+            metadata = {
+                "job_id": job,
+                "filename": os.path.basename(file_path),
+                "files_md5": str(fn_md5),
+                "media": "True",
+            }
+            headers["Upload-Metadata"] = metadata
+            uploader = tus_client.uploader(
+                file_path, chunk_size=1000 * 1024, headers=headers
+            )
+            data = uploader.upload()
+            print(f"✅ Uploaded {file_path} to: {uploader.url}")
+    except Exception as e:
+        return ("failed", str(e))
 
-    time.sleep(2)
+    time.sleep(0.5)
 
-    data = resp.json()
-    return (data.get("status", "failed"), data.get("error", ""))
+    return (data.get("x-status", "failed"), data.get("x-error", ""))
 
 
 def overwrite_corpus(
@@ -530,11 +573,11 @@ def check_template_and_send(
     user_id = data.get("user_id")
     job = data.get("job")
     if not project or not target or not user_id or not job:
+        if re.search(r"corpus named \S+ already exists", data.get("error", "")):
+            return ("already exists", data.get("corpus_id", "-1"))
         print(f"Failed:")
         for k, v in data.items():
             print(f"{k}: {v}")
-        if re.search(r"corpus named \S+ already exists", data.get("error", "")):
-            return ("already exists", data.get("corpus_id", "-1"))
         return tuple()
 
     url = CREATE_URL if live else CREATE_URL_TEST
@@ -560,46 +603,67 @@ def check_template_and_send(
 
     if os.path.isdir(corpus):
 
-        files = {
-            os.path.splitext(p)[0]: open(os.path.join(base, p), "rb")
+        files = [  # {
+            os.path.join(
+                base, p
+            )  # os.path.splitext(p)[0]: open(os.path.join(base, p), "rb")
             for p in os.listdir(base)
             if os.path.isfile(os.path.join(base, p))
-        }
+        ]  # }
         if filt:
-            files = {
-                k: v
-                for k, v in files.items()
+            files = [  # {
+                k  #: v
+                for k in files  # , v in files.items()
                 if filt in k and k.endswith(VALID_EXTENSIONS + COMPRESSED_EXTENSIONS)
-            }
+            ]  # }
     else:
-        files = {os.path.splitext(corpus)[0]: open(corpus, "rb")}
+        # files = {os.path.splitext(corpus)[0]: open(corpus, "rb")}
+        files = [corpus]
 
     print("Sending data...")
 
-    upload_url = url.removesuffix("/") + "/upload"
-    resp = post(upload_url, params=jso, headers=headers, files=files, verify=False)  # type: ignore
+    upload_url = url.removesuffix("/") + f"/upload"
+    tus_client = CustomTusClient(upload_url)
+    fn_md5 = hashlib.md5(
+        "".join(sorted(os.path.basename(fn) for fn in files)).encode()
+    ).hexdigest()
+    for file_path in files:
+        metadata = {
+            "job_id": job,
+            "filename": os.path.basename(file_path),
+            "files_md5": fn_md5,
+        }
+        headers["Upload-Metadata"] = metadata
+        uploader = tus_client.uploader(
+            file_path, chunk_size=1000 * 1024, headers=headers
+        )
+        data = uploader.upload()
+        print(f"✅ Uploaded {file_path} to: {uploader.url}")
+    # resp = post(upload_url, params=jso, headers=headers, files=files, verify=False)  # type: ignore
 
-    time.sleep(5)
+    time.sleep(0.5)
 
-    print("Checking corpus validity...")
+    print("Waiting for server checks...")
 
-    try:
-        data = resp.json()
-    except Exception:
-        print("Error", resp)
+    # try:
+    #     data = resp.json()
+    # except Exception:
+    #     print("Error", resp)
 
-    if "target" not in data:
+    if "x-target" not in data:
         print(f"Failed:")
         for k, v in data.items():
             print(f"{k}: {v}")
         print("No target. Aborting.")
         return tuple()
-    new_url = url + data["target"]
+    new_url = url + data["x-target"]
     jso["check"] = True
     return new_url, headers, jso
 
 
-def monitor_upload(new_url: str, headers: dict[str, Any], jso: dict[str, Any]) -> int:
+def monitor_db_insert(
+    new_url: str, headers: dict[str, Any], jso: dict[str, Any]
+) -> int:
     """
     Poll /upload and check the status of a job
     """
