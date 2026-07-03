@@ -4,7 +4,7 @@ import re
 
 from .cli import _parse_cmd_line
 from .conllu_builder import process_files
-from .utils import default_json, find_config_file, yes_no_input
+from .utils import default_json, find_config_file, say_yes
 
 ERROR_MSG = """
 Unrecognized input format.
@@ -21,6 +21,7 @@ class Corpert:
         output=None,
         extension=None,
         combine=True,
+        force_yes=False,
         **kwargs,
     ):
         """
@@ -39,6 +40,7 @@ class Corpert:
         self._path = os.path.normpath(content)
         self._combine = combine
         self._on_disk = True
+        self._force_yes = force_yes
         if os.path.isfile(content):
             self._input_files.append(content)
         elif os.path.isdir(content):
@@ -75,7 +77,7 @@ class Corpert:
             print(
                 f"The destination folder {self.output} contains some JSON and/or CSV files which this operation might overwrite. Do you want to proceed?"
             )
-            if not yes_no_input():
+            if not say_yes(auto=self._force_yes):
                 print("Aborting the conversion operation.")
                 return
 
@@ -118,7 +120,7 @@ class Corpert:
                 f"The input folder ({self._path}) contains both files with a CoNLL extension and files with a different extension."
             )
             print("Ignore the files with a non-CoNLL extension?")
-            if yes_no_input():
+            if say_yes(auto=self._force_yes):
                 doc_files = [
                     f for f in doc_files if f.lower().endswith((".conll", ".conllu"))
                 ]

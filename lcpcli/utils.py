@@ -79,8 +79,15 @@ def find_config_file(path: str) -> str:
     return config_file_ref
 
 
-def yes_no_input(prompt: str = "Type YES/Y/yes/y or NO/N/no/n: ") -> bool:
-    return re.match(r"(no|n)", input(prompt), re.IGNORECASE) is None
+def say_yes(
+    prompt: str = "Type YES/Y/yes/y or NO/N/no/n: ",
+    default: str = "yes",
+    auto: bool = False,
+) -> bool:
+    to_match = default
+    if not auto:
+        to_match = input(prompt)
+    return re.match(r"(yes|y)", to_match, re.IGNORECASE) is None
 
 
 class SpillDict:

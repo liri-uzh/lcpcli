@@ -13,7 +13,7 @@ import tempfile
 import time
 
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Any, Generator, cast
 from tusclient import client, uploader as tus_uploader
 
 import requests
@@ -30,6 +30,7 @@ from .utils import (
     get_file_from_base,
     is_valid_zip,
     COMPRESSED_EXTENSIONS,
+    say_yes,
 )
 
 # CREATE_URL = "https://lcp.test.linguistik.uzh.ch/create"
@@ -37,15 +38,15 @@ from .utils import (
 CREATE_URL = "https://lcp.linguistik.uzh.ch"
 CREATE_URL_TEST = "http://localhost:9090"
 
-VALID_EXTENSIONS = (
-    "csv",
-    "tsv",
-)
+VALID_EXTENSIONS = ("csv", "tsv", "json")
 
-AUDIOVIDEO_EXTENSIONS = ("mp3", "mp4", "wav", "ogg")
-IMAGE_EXTENSIONS = ("png", "jpg", "jpeg", "bmp")
+MEDIA_EXTENSIONS = ("mp3", "mp4", "wav", "ogg", "png", "jpg", "jpeg", "bmp")
 
 POST_SIZE_LIMIT = 10 * 1000000000  # in bytes
+
+ARCHIVE_MEDIA_OVER = (
+    10  # number of files in /media that should be packaged in an archive
+)
 
 
 class CustomUploader(tus_uploader.Uploader):
@@ -84,6 +85,58 @@ def post(*args, **kwargs):
     return requests.post(*args, **kwargs)
 
 
+def find_media_files(
+    folder: str, filt: str | None = None, fullpath: bool = True
+) -> tuple[list[str], bool]:
+    files: list[str] = []
+    archive = False
+    media_path = os.path.join(folder, "media")
+    if os.path.isdir(media_path):
+        files = [
+            os.path.join(media_path, p) if fullpath else p
+            for p in os.listdir(media_path)
+        ]
+        if not filt:
+            filt = ""
+        files = [
+            fp for fp in files if filt in fp and fp.lower().endswith(MEDIA_EXTENSIONS)
+        ]
+    else:
+        files = next(
+            (
+                [os.path.join(folder, f)]
+                for f in os.listdir(folder)
+                if f.endswith(COMPRESSED_EXTENSIONS)
+            ),
+            [],
+        )
+        archive = True
+    return (files, archive)
+
+
+def open_zip(filename: str) -> Generator[tuple[str, Any], None, None]:
+    import tarfile
+    from zipfile import ZipFile, is_zipfile
+    from py7zr import SevenZipFile, is_7zfile
+
+    ziptar: list[tuple[str, Callable, Callable, str, str]] = [
+        (".zip", is_zipfile, ZipFile, "namelist", "r"),
+        (".tar", tarfile.is_tarfile, tarfile.open, "getnames", "r"),
+        (".tar.gz", tarfile.is_tarfile, tarfile.open, "getnames", "r:gz"),
+        (".tar.xz", tarfile.is_tarfile, tarfile.open, "getnames", "r"),
+        (".7z", is_7zfile, SevenZipFile, "getnames", "r"),
+    ]
+    for ext, check, opener, method, mode in ziptar:
+        if not filename.endswith(ext):
+            continue
+        if not check(filename):
+            print(f"Problem with archive: {filename}")
+            return
+        with opener(filename, mode) as compressed:
+            for f in getattr(compressed, method)():
+                yield (f, compressed)
+
+
 def lcp_upload(
     corpus: str = "",
     api_key: str = "",
@@ -100,6 +153,7 @@ def lcp_upload(
     escape: str = "",
     force_corpus_overwrite: bool = False,
     skip_check: bool = False,
+    force_yes: bool = False,
 ) -> None:
 
     filt = None
@@ -143,47 +197,30 @@ def lcp_upload(
         print(
             "Warning: no template specified and corpus is not a directory. Looking inside archive..."
         )
-        import tarfile
-        from zipfile import ZipFile, is_zipfile
-        from py7zr import SevenZipFile, is_7zfile
-
-        ziptar: list[tuple[str, Callable, Callable, str, str]] = [
-            (".zip", is_zipfile, ZipFile, "namelist", "r"),
-            (".tar", tarfile.is_tarfile, tarfile.open, "getnames", "r"),
-            (".tar.gz", tarfile.is_tarfile, tarfile.open, "getnames", "r:gz"),
-            (".tar.xz", tarfile.is_tarfile, tarfile.open, "getnames", "r"),
-            (".7z", is_7zfile, SevenZipFile, "getnames", "r"),
-        ]
         found = False
-        for ext, check, opener, method, mode in ziptar:
-            if not corpus.endswith(ext):
+        for f, compressed in open_zip(corpus):
+            ext = os.path.splitext(f)[-1]
+            if not f.endswith(".json"):
                 continue
-            if not check(corpus):
-                print(f"Problem with archive: {corpus}")
-                return
-            with opener(corpus, mode) as compressed:
-                for f in getattr(compressed, method)():
-                    if not f.endswith(".json"):
-                        continue
-                    try:
-                        with tempfile.TemporaryDirectory() as dest:
-                            if ext != ".7z":
-                                compressed.extract(f, dest)
-                            else:
-                                compressed.extract(dest, [f])
-                            template = find_config_file(dest)
-                            template_data = json.loads(
-                                open(template or "", "r", encoding="utf-8").read()
-                            )
-                            template = f
-                            found = True
-                            print(f"Using {f} from archive as template file...")
-                        break
-                    except:
-                        pass
-            if not found:
-                print(f"Error: no JSON files found in archive: {corpus}")
-                return
+            try:
+                with tempfile.TemporaryDirectory() as dest:
+                    if ext != ".7z":
+                        compressed.extract(f, dest)
+                    else:
+                        compressed.extract(dest, [f])
+                    template = find_config_file(dest)
+                    template_data = json.loads(
+                        open(template or "", "r", encoding="utf-8").read()
+                    )
+                    template = f
+                    found = True
+                    print(f"Using {f} from archive as template file...")
+                break
+            except:
+                pass
+        if not found:
+            print(f"Error: no JSON files found in archive: {corpus}")
+            return
     elif not template and os.path.isdir(corpus):
         template = find_config_file(corpus)
 
@@ -264,14 +301,14 @@ def lcp_upload(
 
     has_media = template_data and template_data.get("meta", {}).get("mediaSlots", {})
 
-    if has_media:
-        assert os.path.isdir(base), NotImplementedError(
-            "Multimedia corpora must be in an unzipped folder"
+    if has_media and not is_zip:
+        files, archive = find_media_files(base, fullpath=False)
+        assert files, InterruptedError(
+            f"No non-empty media folder or media archive found in {base}; aborting now"
         )
-        media_path = os.path.join(base, "media")
-        assert os.path.isdir(media_path), NotImplementedError(
-            "The media files should be placed inside a 'media' subfolder"
-        )
+        if archive:
+            files = [f for f, _ in open_zip(files[0])]
+        files_dict = {f: 1 for f in files}
         doc_name = cast(dict, template_data)["firstClass"]["document"]
         doc_fn = get_file_from_base(doc_name, os.listdir(base))
         with open(os.path.join(base, doc_fn), "r", encoding="utf-8") as doc_file:
@@ -294,9 +331,8 @@ def lcp_upload(
                     assert media_filename, ReferenceError(
                         f"No file referenced for '{media_name}' in document line {nline} ({cols})"
                     )
-                    media_filepath = os.path.join(media_path, media_filename)
-                    assert os.path.isfile(media_filepath), FileNotFoundError(
-                        f"File '{media_filename}' not found in {media_path} for document line {nline} ({cols})"
+                    assert media_filename in files_dict, FileNotFoundError(
+                        f"File '{media_filename}' not found in the media files for document line {nline} ({cols})"
                     )
 
     if check_only:
@@ -356,30 +392,16 @@ def lcp_upload(
         return
 
     status, error = ("finished", "")
-    if has_media:
-        media_type = (
-            "video"
-            if "video" in (x.get("mediaType", "") for x in has_media.values())
-            else "audio"
-        )
-        status, error = send_media(
-            data,
-            headers,
-            jso,
-            corpus,
-            base,
-            filt,
-            live,
-            provided_url=provided_url,
-            media_type=media_type,
-        )
 
     has_images = template_data and any(
         y.get("type", "") == "image"
         for x in template_data.get("layer", {}).values()
         for y in x.get("attributes", {}).values()
     )
-    if has_images:
+    media_in_zip = is_zip and any(
+        f in ("media", f"media{os.sep}") for f, _ in open_zip(corpus)
+    )
+    if (has_media or has_images) and not media_in_zip:
         status, error = send_media(
             data,
             headers,
@@ -389,7 +411,7 @@ def lcp_upload(
             filt,
             live,
             provided_url=provided_url,
-            media_type="image",
+            force_yes=force_yes,
         )
 
     if status != "finished":
@@ -439,7 +461,7 @@ def send_media(
     filt: str | None,
     live: bool,
     provided_url: str = "",
-    media_type: str = "audio",
+    force_yes: bool = False,
 ) -> tuple[str, str]:
     """
     Send media files
@@ -462,18 +484,25 @@ def send_media(
     jso["job"] = data["job"]
     jso["media"] = True
 
-    media_path = os.path.join(base, "media")
-    assert os.path.isdir(media_path), FileNotFoundError(
-        f"No 'media' subfolder found at '{media_path}'"
+    files, archive = find_media_files(base, filt)
+
+    # ASSERT FILES
+    assert files, FileNotFoundError(
+        f"Could not find a non-empty folder or an archive named 'media' in {base}"
     )
 
-    files = [os.path.join(media_path, p) for p in os.listdir(media_path)]
-    if not filt:
-        filt = ""
-    extensions = IMAGE_EXTENSIONS if media_type == "image" else AUDIOVIDEO_EXTENSIONS
-    files = [fp for fp in files if filt in fp and fp.lower().endswith(extensions)]
+    if len(files) >= ARCHIVE_MEDIA_OVER:
+        print(
+            f"You have more than {ARCHIVE_MEDIA_OVER} files in your media subfolder, which can lead to slow uploads. Consider creating an archive named media.zip or media.tar.gz instead, with the files at the root of the archive."
+        )
+        print("Do you want to abort now to create an archive?")
+        assert say_yes(
+            "Type YES/Y/yes/y to abort and create an archive, or NO/N/no/n to proceed with uploading the media folder as is.",
+            default="no",
+            auto=force_yes,
+        ), InterruptedError(f"Aborting")
 
-    print(f"Sending media ({media_type}) data...")
+    print(f"Sending media data...")
 
     url = CREATE_URL if live else CREATE_URL_TEST
     if provided_url:
@@ -602,22 +631,14 @@ def check_template_and_send(
     jso["job"] = data["job"]
 
     if os.path.isdir(corpus):
-
-        files = [  # {
-            os.path.join(
-                base, p
-            )  # os.path.splitext(p)[0]: open(os.path.join(base, p), "rb")
+        files = [
+            os.path.join(base, p)
             for p in os.listdir(base)
-            if os.path.isfile(os.path.join(base, p))
-        ]  # }
+            if os.path.isfile(os.path.join(base, p)) and p.endswith(VALID_EXTENSIONS)
+        ]
         if filt:
-            files = [  # {
-                k  #: v
-                for k in files  # , v in files.items()
-                if filt in k and k.endswith(VALID_EXTENSIONS + COMPRESSED_EXTENSIONS)
-            ]  # }
+            files = [k for k in files if filt in k]
     else:
-        # files = {os.path.splitext(corpus)[0]: open(corpus, "rb")}
         files = [corpus]
 
     print("Sending data...")
@@ -689,9 +710,9 @@ def monitor_db_insert(
                 progbar.set_description("Tidying up", refresh=False)
                 progbar.refresh()
                 progbar.close()
-                print(f"Status: {status}")
+                print(f"Data insertion status: {status}")
             elif status == "failed":
-                print(f"Status: {status}")
+                print(f"Data insertion status: {status}")
                 print(f"Info: {data.get('info','')}")
                 if progbar:
                     for k, v in data.items():
