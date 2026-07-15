@@ -58,9 +58,24 @@ class CustomUploader(tus_uploader.Uploader):
             self.metadata = metadata
         self.client.headers.update(headers)
         self.last_post_headers = None
+        self.tqdm = tqdm(
+            total=self.get_file_size(),
+            desc=f"Uploading {self.metadata.get('filename', 'file')}",
+            unit_scale=True,
+            ncols=100,
+            leave=False,
+        )
 
     def _do_request(self):
         super()._do_request()
+        offset = self.get_offset()
+        total_size = self.get_file_size()
+        if offset < total_size:
+            self.tqdm.n = offset
+            self.tqdm.refresh()
+        else:
+            self.tqdm.close()
+            self.tqdm.clear()
         try:
             self.last_post_headers = self.request.response_headers
         except:
@@ -415,7 +430,7 @@ def lcp_upload(
         )
 
     if status != "finished":
-        print(f"Upload failed: {error}")
+        print(f"Upload failed: {status} - {error}")
     else:
         if overwrite_id and overwrite_id > 0:
             status, error_or_job_id = overwrite_corpus(
@@ -660,16 +675,10 @@ def check_template_and_send(
         )
         data = uploader.upload()
         print(f"✅ Uploaded {file_path} to: {uploader.url}")
-    # resp = post(upload_url, params=jso, headers=headers, files=files, verify=False)  # type: ignore
 
     time.sleep(0.5)
 
     print("Waiting for server checks...")
-
-    # try:
-    #     data = resp.json()
-    # except Exception:
-    #     print("Error", resp)
 
     if "x-target" not in data:
         print(f"Failed:")
@@ -686,7 +695,7 @@ def monitor_db_insert(
     new_url: str, headers: dict[str, Any], jso: dict[str, Any]
 ) -> int:
     """
-    Poll /upload and check the status of a job
+    Poll /monitor_db_insert and check the status of a job
     """
     status = None
     wait = 8
@@ -696,7 +705,7 @@ def monitor_db_insert(
     unit: str = "byte"
 
     while True:
-        resp = post(new_url, headers=headers, params=jso)  # type: ignore
+        resp = requests.get(new_url, headers=headers)
         data = resp.json()
 
         if data.get("status") != status and data["status"] not in bads:
