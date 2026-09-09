@@ -167,6 +167,7 @@ class Corpus:
         revision: int | float = 1,
         url: str = "placeholder",
         license: str | None = None,
+        tmp_dir: str | None = None,
     ):
         self._name = name
         self._document = document
@@ -184,10 +185,11 @@ class Corpus:
         self._url = url
         self._license = license
         self._upperFrameDocument = 0
+        self._tmp_dir = tmp_dir
 
     def _csv_writer(self, fn: str):
         tmp = tempfile.NamedTemporaryFile(
-            "w+", encoding="utf-8", newline="\n", delete=False
+            "w+", encoding="utf-8", newline="\n", delete=False, dir=self._tmp_dir
         )
         self._files[fn] = tmp
         return csv.writer(tmp)
