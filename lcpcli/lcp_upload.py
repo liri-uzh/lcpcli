@@ -57,7 +57,7 @@ class CustomUploader(tus_uploader.Uploader):
         if metadata:
             self.metadata = metadata
         self.client.headers.update(headers)
-        self.last_post_headers = None
+        self.last_post_headers = {}
         self.tqdm = tqdm(
             total=self.get_file_size(),
             desc=f"Uploading {self.metadata.get('filename', 'file')}",
@@ -539,7 +539,8 @@ def send_media(
             uploader = tus_client.uploader(
                 file_path, chunk_size=1000 * 1024, headers=headers
             )
-            data = uploader.upload()
+            # No request object so no response.headers for 0-bit files: set 'finished' manually
+            data = uploader.upload() or {"x-status": "finished"}
             print(f"✅ Uploaded {file_path} to: {uploader.url}")
     except Exception as e:
         return ("failed", str(e))
@@ -779,9 +780,9 @@ def check_template(
 
     while True:
         if not status or not (elapsed * 10 % wait):
-            url = url.removesuffix("/") + data["target"]
-            cparams = {"job": data["job"], "project": project}
-            resp = post(url, params=cparams, headers=headers)  # type: ignore
+            status_url = url.removesuffix("/") + data["target"]
+            cparams = {"project": project}
+            resp = post(status_url, params=cparams, headers=headers)  # type: ignore
             data = resp.json()
             if data.get("status") != status:
                 print("")
